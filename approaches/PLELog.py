@@ -310,7 +310,7 @@ if __name__ == '__main__':
             for onebatch in data_iter(labeled_train, batch_size, True):
                 plelog.model.train()
                 tinst = generate_tinsts_binary_label(onebatch, vocab)
-                tinst.to_cuda(device)
+                tinst.to_device(device)
                 loss = plelog.forward(tinst.inputs, tinst.targets)
                 loss_value = loss.data.cpu().numpy()
                 loss.backward()
