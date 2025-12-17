@@ -191,16 +191,16 @@ if __name__ == '__main__':
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
     # Check the first few rows of the DataFrame
-    print(train_df.head())
+    print(train.head())
 
     # Inspect just the 'Label' column
-    print(train_df['Label'].head())  # first 5 labels
+    print(train['Label'].head())  # first 5 labels
 
     # See unique values in the 'Label' column
-    print(train_df['Label'].unique())
+    print(train['Label'].unique())
 
     # Get counts for each label
-    print(train_df['Label'].value_counts())
+    print(train['Label'].value_counts())
     exit()
 
     # ---------------- Build embeddings ----------------
