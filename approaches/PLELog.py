@@ -236,7 +236,7 @@ if __name__ == '__main__':
     print(train_df['Label'].value_counts())
    # exit()
     # ---------------- Load datasets ----------------
-    label2id = {'Normal': 0, 'Anomaly': 1}
+ #   #label2id = {'Normal': 0, 'Anomaly': 1}
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
@@ -304,7 +304,11 @@ if __name__ == '__main__':
     vocab = Vocab()
     vocab.load_from_dict(processor.embedding)
 
-    plelog = PLELog(vocab, num_layer, lstm_hiddens, processor.label2id)
+    # Define label2id explicitly
+    label2id = {'Normal': 0, 'Anomaly': 1}
+
+    plelog = PLELog(vocab, num_layer, lstm_hiddens, label2id)
+    plelog.anomaly_id = label2id['Anomaly']
 
     log_name = f'layer={num_layer}_hidden={lstm_hiddens}_epoch={epochs}'
     best_model_file = os.path.join(output_model_dir, log_name + '_best.pt')
