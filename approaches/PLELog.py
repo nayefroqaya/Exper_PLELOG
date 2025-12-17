@@ -15,6 +15,8 @@ from representations.sequences.statistics import Sequential_TF
 from preprocessing.datacutter.SimpleCutting import cut_by_613
 from preprocessing.AutoLabeling import Probabilistic_Labeling
 from preprocessing.Preprocess import Preprocessor
+from preprocessing.Preprocess import PKLPreprocessor
+
 from module.Optimizer import Optimizer
 from module.Common import data_iter, generate_tinsts_binary_label, batch_variable_inst
 from models.gru import AttGRUModel
