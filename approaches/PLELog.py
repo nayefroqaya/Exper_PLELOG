@@ -212,9 +212,6 @@ if __name__ == '__main__':
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
     # Check the first few rows of the DataFrame
-    print(train.head())
-
-
 
     # ---------------- Build embeddings ----------------
     # Sequential_TF expects a dictionary {event_id: embedding_vector}
