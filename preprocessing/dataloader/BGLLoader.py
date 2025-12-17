@@ -544,7 +544,7 @@ class BGLLoader(BasicDataLoader):
                         for (idx, line) in seq:
                             self.block2seqs[str(block_idx)].append(int(idx))
                             if not line.startswith('-'):
-                                label = 'Anomalous'
+                                label = 'Anomaly'
                         self.block2label[str(block_idx)] = label
                         block_idx += 1
                     else:
@@ -556,7 +556,7 @@ class BGLLoader(BasicDataLoader):
                             for (idx, line) in seq[i:i + self.window_size]:
                                 self.block2seqs[str(block_idx)].append(int(idx))
                                 if not line.startswith('-'):
-                                    label = 'Anomalous'
+                                    label = 'Anomaly'
                             self.block2label[str(block_idx)] = label
                             block_idx += 1
                             i += self.window_size

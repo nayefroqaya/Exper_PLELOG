@@ -53,6 +53,6 @@ class Log_Time_Step:
         self.sequence = [log.id for log in self.logs]
         self.label = 'Normal'
         for log in self.logs:
-            if log.label == 'Anomalous':
-                self.label = 'Anomalous'
+            if log.label == 'Anomaly':
+                self.label = 'Anomaly'
                 break

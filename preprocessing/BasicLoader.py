@@ -27,8 +27,8 @@ class BasicDataLoader():
         self.log2temp = {}
         self.rex = []
         self.remove_cols = []
-        self.id2label = {0: 'Normal', 1: 'Anomalous'}
-        self.label2id = {'Normal': 0, 'Anomalous': 1}
+        self.id2label = {0: 'Normal', 1: 'Anomaly'}
+        self.label2id = {'Normal': 0, 'Anomaly': 1}
         self.block_set = set()
         self.block2seqs = {}
         self.block2label = {}

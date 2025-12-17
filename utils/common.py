@@ -73,7 +73,7 @@ def generate_inputs_and_labels(insts, label2idx):
     labels = np.zeros(len(insts))
     for idx, inst in enumerate(insts):
         inputs.append([int(x) for x in inst.sequence])
-        if inst.label in ['Normal', 'Anomalous']:
+        if inst.label in ['Normal', 'Anomaly']:
             if inst.label == 'Normal':
                 label = 0
             else:

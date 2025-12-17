@@ -129,14 +129,14 @@ class Solitary_HDBSCAN():
                     predicted.append('Normal')
                 else:
                     by_dist_anomalous += 1
-                    predicted.append('Anomalous')
+                    predicted.append('Anomaly')
 
                 pass
             else:
                 by_normal_core_anomalous += 1
-                predicted.append('Anomalous')
+                predicted.append('Anomaly')
         self.logger.info(
-            'Found %d normal, %d anomalous by normal clusters' % (by_normal_core_normal, by_normal_core_anomalous))
-        self.logger.info('Found %d normal, %d anomalous by minimum distances' % (by_dist_normal, by_dist_anomalous))
+            'Found %d normal, %d Anomaly by normal clusters' % (by_normal_core_normal, by_normal_core_anomalous))
+        self.logger.info('Found %d normal, %d Anomaly by minimum distances' % (by_dist_normal, by_dist_anomalous))
         return predicted
 

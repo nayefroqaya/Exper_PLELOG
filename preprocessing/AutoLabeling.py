@@ -91,7 +91,7 @@ class Probabilistic_Labeling():
                         FN_Counter[label] += 1
                     pass
                 else:
-                    if ground_truth[idx] == 'Anomalous':
+                    if ground_truth[idx] == 'Anomaly':
                         TP += 1
                     else:
                         FP += 1
