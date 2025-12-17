@@ -4,6 +4,73 @@ from preprocessing.dataloader.BGLLoader import BGLLoader
 from preprocessing.dataloader.HDFSLoader import HDFSLoader
 
 
+
+class PKLPreprocessor:
+    def __init__(self):
+        self.train_event2idx = {}
+        self.test_event2idx = {}
+        self.id2label = {0: 'Normal', 1: 'Anomalous'}
+        self.label2id = {'Normal': 0, 'Anomalous': 1}
+        self.embedding = None   # Will be built from EventId
+        self.templates = []
+
+    def load_pkl(self, train_pkl, dev_pkl=None, test_pkl=None):
+        train_df = pickle.load(open(train_pkl, 'rb'))
+        dev_df   = pickle.load(open(dev_pkl, 'rb')) if dev_pkl else None
+        test_df  = pickle.load(open(test_pkl, 'rb'))
+
+        train = self._df_to_instances(train_df)
+        dev   = self._df_to_instances(dev_df) if dev_df is not None else []
+        test  = self._df_to_instances(test_df)
+
+        self._build_embedding(train + dev + test)
+        self._update_event2idx(train, test)
+
+        return train, dev, test
+
+    def _df_to_instances(self, df):
+        instances = []
+
+        for block_id, g in df.groupby('Node_block_id'):
+            sequence = g['EventId'].astype(int).tolist()
+
+            label = g['Label'].iloc[0]
+            label = 'Normal' if label in [0, 'Normal'] else 'Anomalous'
+
+            inst = Instance(
+                id=block_id,
+                sequence=sequence,
+                label=label
+            )
+            instances.append(inst)
+
+        return instances
+
+    def _build_embedding(self, instances):
+        """
+        Build EventId → index embedding
+        """
+        events = set()
+        for inst in instances:
+            events.update(inst.sequence)
+
+        events = sorted(events)
+        self.embedding = {e: idx for idx, e in enumerate(events)}
+
+    def _update_event2idx(self, train, test):
+        for inst in train:
+            for e in inst.sequence:
+                if e not in self.train_event2idx:
+                    self.train_event2idx[e] = len(self.train_event2idx)
+
+        for inst in test:
+            for e in inst.sequence:
+                if e in self.train_event2idx:
+                    self.test_event2idx[e] = self.train_event2idx[e]
+                else:
+                    self.test_event2idx[e] = len(self.train_event2idx)
+
+
 class Preprocessor:
     def __init__(self):
         self.dataloader = None

@@ -178,9 +178,15 @@ if __name__ == '__main__':
     start_time_nayef = time.time()
     # Training, Validating and Testing instances.
     template_encoder = Template_TF_IDF_without_clean() if dataset == 'NC' else Simple_template_TF_IDF()
-    processor = Preprocessor()
-    train, dev, test = processor.process(dataset=dataset, parsing=parser, cut_func=cut_by_613,
-                                         template_encoding=template_encoder.present)
+
+    processor = PKLPreprocessor()
+
+    train, dev, test = processor.load_pkl(train_pkl='path/to/train.pkl', dev_pkl='path/to/val.pkl',
+        test_pkl='path/to/test.pkl')
+
+    #processor = Preprocessor()
+    #train, dev, test = processor.process(dataset=dataset, parsing=parser, cut_func=cut_by_613,
+    #                                     template_encoding=template_encoder.present)
 
     print(type(train))
     print(train)
