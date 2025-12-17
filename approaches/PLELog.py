@@ -213,6 +213,7 @@ if __name__ == '__main__':
     dev_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl'
     test_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl'
 
+
     # Load the pickled DataFrames
     with open(train_pkl, 'rb') as f:
         train_df = pickle.load(f)
@@ -235,6 +236,7 @@ if __name__ == '__main__':
     print(train_df['Label'].value_counts())
    # exit()
     # ---------------- Load datasets ----------------
+    label2id = {'Normal': 0, 'Anomaly': 1}
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
