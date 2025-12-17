@@ -190,9 +190,8 @@ if __name__ == '__main__':
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
 
-    # ----------------------------
-    # Prepare embeddings dict for Sequential_TF
-    # ----------------------------
+    # ---------------- Build embeddings ----------------
+    # Sequential_TF expects a dictionary {event_id: embedding_vector}
     all_event_ids = set()
     for inst in train + dev + test:
         all_event_ids.update(inst.sequence)
@@ -200,11 +199,8 @@ if __name__ == '__main__':
     embedding_dim = 50
     processor.embedding = {eid: np.random.rand(embedding_dim) for eid in all_event_ids}
 
-    # ----------------------------
-    # Log sequence representation
-    # ----------------------------
+    # ---------------- Sequence representation ----------------
     sequential_encoder = Sequential_TF(processor.embedding)
-
     train_reprs = sequential_encoder.present(train)
     for idx, inst in enumerate(train):
         inst.repr = train_reprs[idx]
@@ -213,14 +209,10 @@ if __name__ == '__main__':
     for idx, inst in enumerate(test):
         inst.repr = test_reprs[idx]
 
-    # ----------------------------
-    # Dimension reduction (FastICA)
-    # ----------------------------
+    # ---------------- Dimension reduction (optional) ----------------
     if reduce_dimension != -1:
-        start_time = time.time()
         np.random.seed(0)
         train_reprs += np.random.normal(0, 1e-5, train_reprs.shape)
-
         scaler = StandardScaler()
         train_reprs = scaler.fit_transform(train_reprs)
         train_reprs = np.nan_to_num(train_reprs, nan=0.0, posinf=1e6, neginf=-1e6)
@@ -228,24 +220,19 @@ if __name__ == '__main__':
         print(f"Start FastICA, target dimension: {reduce_dimension}")
         transformer = FastICA(n_components=reduce_dimension)
         train_reprs = transformer.fit_transform(train_reprs)
-
         for idx, inst in enumerate(train):
             inst.repr = train_reprs[idx]
+        print("Dimension reduction finished")
 
-        print(f'Finished FastICA in {time.time() - start_time:.2f} seconds')
-
-    # ----------------------------
-    # Probabilistic labeling
-    # ----------------------------
-    train_normal = [x for x, inst in enumerate(train) if inst.label == 'Normal']
+    # ---------------- Probabilistic labeling ----------------
+    train_normal = [i for i, inst in enumerate(train) if inst.label == 'Normal']
     normal_ids = train_normal[:int(0.5 * len(train_normal))]
+
     label_generator = Probabilistic_Labeling(min_samples=min_samples, min_clust_size=min_cluster_size,
                                              res_file=prob_label_res_file, rand_state_file=rand_state)
     labeled_train = label_generator.auto_label(train, normal_ids)
 
-    # ----------------------------
-    # Evaluate probabilistic labeling
-    # ----------------------------
+    # Check probabilistic labeling results
     TP = TN = FP = FN = 0
     for inst in labeled_train:
         if inst.predicted == 'Normal':
@@ -259,31 +246,24 @@ if __name__ == '__main__':
             else:
                 FP += 1
 
-    print(f'TP {TP} TN {TN} FP {FP} FN {FN}')
     p, r, f = get_precision_recall(TP, TN, FP, FN)
+    print(f'Probabilistic labeling: TP={TP}, TN={TN}, FP={FP}, FN={FN}')
     print(f'Precision={p:.4f}, Recall={r:.4f}, F1={f:.4f}')
 
-    # ----------------------------
-    # Load embeddings and initialize model
-    # ----------------------------
+    # ---------------- Load Vocab and Initialize Model ----------------
     vocab = Vocab()
     vocab.load_from_dict(processor.embedding)
 
     plelog = PLELog(vocab, num_layer, lstm_hiddens, processor.label2id)
 
-    log_str = f'layer={num_layer}_hidden={lstm_hiddens}_epoch={epochs}'
-    best_model_file = os.path.join(output_model_dir, log_str + '_best.pt')
-    last_model_file = os.path.join(output_model_dir, log_str + '_last.pt')
-    if not os.path.exists(output_model_dir):
-        os.makedirs(output_model_dir)
+    log_name = f'layer={num_layer}_hidden={lstm_hiddens}_epoch={epochs}'
+    best_model_file = os.path.join(output_model_dir, log_name + '_best.pt')
+    last_model_file = os.path.join(output_model_dir, log_name + '_last.pt')
 
-    # ----------------------------
-    # Training
-    # ----------------------------
+    # ---------------- Training ----------------
     if mode == 'train':
         optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
         bestF = 0
-        global_step = 0
         batch_num = int(np.ceil(len(labeled_train) / float(batch_size)))
 
         for epoch in range(epochs):
@@ -291,21 +271,17 @@ if __name__ == '__main__':
             for batch_idx, onebatch in enumerate(data_iter(labeled_train, batch_size, True)):
                 tinst = generate_tinsts_binary_label(onebatch, vocab)
                 tinst.to_device(device)
-
                 loss = plelog.forward(tinst.inputs, tinst.targets)
                 loss_value = loss.data.cpu().numpy()
                 loss.backward()
-
                 nn.utils.clip_grad_norm_(filter(lambda p: p.requires_grad, plelog.model.parameters()), max_norm=1)
                 optimizer.step()
                 plelog.model.zero_grad()
-                global_step += 1
 
+            # Save last model
             torch.save(plelog.model.state_dict(), last_model_file)
 
-    # ----------------------------
-    # Testing / Evaluation
-    # ----------------------------
+    # ---------------- Evaluation ----------------
     if os.path.exists(last_model_file):
         plelog.model.load_state_dict(torch.load(last_model_file))
         plelog.evaluate(test, threshold)
@@ -314,7 +290,9 @@ if __name__ == '__main__':
         plelog.model.load_state_dict(torch.load(best_model_file))
         plelog.evaluate(test, threshold)
 
-    print('All Finished')
+    print("All Finished")
+
+
 
 
 
