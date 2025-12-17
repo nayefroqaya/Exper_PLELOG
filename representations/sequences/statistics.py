@@ -20,6 +20,36 @@ StaticLogger.info(
     (os.getcwd(), LOG_ROOT))
 
 
+
+class Sequential_TF():
+    def __init__(self, id2embed):
+        assert isinstance(id2embed, dict)
+        self.vocab_size = len(id2embed)
+        # Use the first embedding vector to get dimension
+        self.word_dim = next(iter(id2embed.values())).shape
+        self.id2embed = id2embed
+
+    def transform(self, instances):
+        reprs = []
+        for inst in instances:
+            repr = np.zeros(self.word_dim)
+            for idx in inst.sequence:
+                if idx in self.id2embed:
+                    repr += self.id2embed[idx]
+            reprs.append(repr)
+        return np.asarray(reprs, dtype=np.float64)
+
+    def present(self, instances):
+        represents = []
+        if isinstance(instances, list):
+            represents = self.transform(instances)
+        else:
+            StaticLogger.error(
+                'Sequential TF encoder only accepts list objects as input, got %s' % type(instances))
+        return represents
+
+
+'''
 class Sequential_TF():
     def __init__(self, id2embed):
         assert isinstance(id2embed, dict)
@@ -47,3 +77,4 @@ class Sequential_TF():
             StaticLogger.error(
                 'Sequential TF encoder only accepts list objects as input, got %s' % type(instances))
         return represents
+'''
