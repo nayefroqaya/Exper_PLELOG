@@ -75,6 +75,27 @@ class PLELog:
     def predict(self, inputs, threshold=None):
         with torch.no_grad():
             tag_logits = self.model(inputs)
+            tag_logits = F.softmax(tag_logits, dim=1)
+
+        anomaly_id = self.anomaly_id
+
+        if threshold is not None:
+            probs = tag_logits.detach().cpu().numpy()
+            pred_tags = np.zeros(probs.shape[0], dtype=int)
+
+            for i, logits in enumerate(probs):
+                if logits[anomaly_id] >= threshold:
+                    pred_tags[i] = anomaly_id
+                else:
+                    pred_tags[i] = 1 - anomaly_id
+        else:
+            pred_tags = tag_logits.detach().max(1)[1].cpu().numpy()
+
+        return pred_tags, tag_logits
+
+        '''
+        with torch.no_grad():
+            tag_logits = self.model(inputs)
             tag_logits = F.softmax(tag_logits)
         if threshold is not None:
             probs = tag_logits.detach().cpu().numpy()
@@ -89,6 +110,7 @@ class PLELog:
         else:
             pred_tags = tag_logits.detach().max(1)[1].cpu()
         return pred_tags, tag_logits
+        '''
 
     def evaluate(self, instances, threshold=0.5):
         self.logger.info('Start evaluating by threshold %.3f' % threshold)
