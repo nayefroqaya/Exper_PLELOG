@@ -54,18 +54,23 @@ class PLELog:
 
     def __init__(self, vocab, num_layer, hidden_size, label2id):
         self.label2id = label2id
+
+        # Make sure anomaly_id exists
+        if 'Anomaly' in label2id:
+            self.anomaly_id = label2id['Anomaly']
+
+        else:
+            raise ValueError(f"Unknown labels in label2id: {label2id}")
+
         self.vocab = vocab
         self.num_layer = num_layer
         self.hidden_size = hidden_size
         self.batch_size = 128
         self.test_batch_size = 1024
+
         self.model = AttGRUModel(vocab, self.num_layer, self.hidden_size)
-        #if torch.cuda.is_available():
-        #    self.model = self.model.cuda(device)
         self.model = self.model.to(device)
-
         self.loss = nn.BCELoss()
-
     def forward(self, inputs, targets):
         tag_logits = self.model(inputs)
         tag_logits = F.softmax(tag_logits, dim=1)
