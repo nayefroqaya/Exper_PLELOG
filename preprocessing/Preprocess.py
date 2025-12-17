@@ -44,10 +44,10 @@ class PKLPreprocessor:
         for block_id, g in grouped:
             # Event sequence
             sequence = g['EventId'].tolist()
-            # Label: if any row is 'Anomalous', the whole block is 'Anomalous'
+            # Label: if any row is 'Anomaly', the whole block is 'Anomaly'
             label = 'Normal'
-            if (g['Label'] == 'Anomalous').any():
-                label = 'Anomalous'
+            if (g['Label'] == 'Anomaly').any():
+                label = 'Anomaly'
 
             # Create Instance using correct argument names
             inst = Instance(block_id=block_id, log_sequence=sequence, label=label)
@@ -87,8 +87,8 @@ class Preprocessor:
         self.base = None
         self.dataset = None
         self.parsing = None
-        self.tag2id = {'Normal': 0, 'Anomalous': 1}
-        self.id2tag = {0: 'Normal', 1: 'Anomalous'}
+        self.tag2id = {'Normal': 0, 'Anomaly': 1}
+        self.id2tag = {0: 'Normal', 1: 'Anomaly'}
         self.logger = self._set_logger()
         pass
 
@@ -206,13 +206,13 @@ class Preprocessor:
         train_label_counter = Counter([inst.label for inst in train])
         if dev:
             dev_label_counter = Counter([inst.label for inst in dev])
-            self.logger.info('Dev: %d Normal, %d Anomalous instances.', dev_label_counter['Normal'],
-                             dev_label_counter['Anomalous'])
+            self.logger.info('Dev: %d Normal, %d Anomaly instances.', dev_label_counter['Normal'],
+                             dev_label_counter['Anomaly'])
         test_label_counter = Counter([inst.label for inst in test])
-        self.logger.info('Train: %d Normal, %d Anomalous instances.', train_label_counter['Normal'],
-                         train_label_counter['Anomalous'])
-        self.logger.info('Test: %d Normal, %d Anomalous instances.', test_label_counter['Normal'],
-                         test_label_counter['Anomalous'])
+        self.logger.info('Train: %d Normal, %d Anomaly instances.', train_label_counter['Normal'],
+                         train_label_counter['Anomaly'])
+        self.logger.info('Test: %d Normal, %d Anomaly instances.', test_label_counter['Normal'],
+                         test_label_counter['Anomaly'])
 
     def update_event2idx_mapping(self, pre, post):
         '''
