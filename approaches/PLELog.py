@@ -272,14 +272,11 @@ if __name__ == '__main__':
     p, r, f = get_precision_recall(TP, TN, FP, FN)
     print(f'Probabilistic labeling: TP={TP}, TN={TN}, FP={FP}, FN={FN}')
     print(f'Precision={p:.4f}, Recall={r:.4f}, F1={f:.4f}')
-
-
-    # ---------------- Load Vocab and Initialize Model ----------------
+    # ---------------- Load Vocab and Initialize Model ------------------
     vocab = Vocab()
     vocab.load_from_dict(processor.embedding)
 
     plelog = PLELog(vocab, num_layer, lstm_hiddens, processor.label2id)
-
     log_name = f'layer={num_layer}_hidden={lstm_hiddens}_epoch={epochs}'
     best_model_file = os.path.join(output_model_dir, log_name + '_best.pt')
     last_model_file = os.path.join(output_model_dir, log_name + '_last.pt')
@@ -287,6 +284,7 @@ if __name__ == '__main__':
     log = 'layer={}_hidden={}_epoch={}'.format(num_layer, lstm_hiddens, epochs)
     best_model_file = os.path.join(output_model_dir, log + '_best.pt')
     last_model_file = os.path.join(output_model_dir, log + '_last.pt')
+
     if not os.path.exists(output_model_dir):
         os.makedirs(output_model_dir)
     if mode == 'train':

@@ -34,6 +34,43 @@ def data_iter(data, batch_size, shuffle=True):
 
 
 def generate_tinsts_binary_label(batch_insts, vocab, if_evaluate=False):
+    slen = max(len(inst.sequence) for inst in batch_insts)
+    batch_size = len(batch_insts)
+
+    tinst = TInstWithLogits(batch_size, slen, 2)
+
+    for b, inst in enumerate(batch_insts):
+        tinst.src_ids.append(str(inst.id))
+
+        # -------- CHOOSE LABEL SOURCE --------
+        if if_evaluate:
+            tag_name = inst.label  # ✅ dev / test
+            confidence = 0.0
+        else:
+            tag_name = inst.predicted  # ✅ training
+            confidence = 0.5 * inst.confidence  # 🔑 SAFETY FIX (this is what you were missing)
+
+        if inst.predicted not in vocab.tag2id:
+            inst.predicted = inst.label
+        tag_id = vocab.tag2id(tag_name)
+
+        # -------- SAFETY CHECK --------
+        if tag_id is None:
+            raise ValueError(f"Unknown tag '{tag_name}' for instance {inst.id}")
+
+        # -------- SET TARGETS --------
+        tinst.tags[b, tag_id] = 1 - confidence
+        tinst.tags[b, 1 - tag_id] = confidence
+        tinst.g_truth[b] = tag_id
+
+        # -------- INPUT SEQUENCE --------
+        cur_slen = len(inst.sequence)
+        tinst.word_len[b] = cur_slen
+        for i in range(min(cur_slen, 500)):
+            tinst.src_words[b, i] = vocab.word2id(inst.sequence[i])
+            tinst.src_masks[b, i] = 1
+
+    '''
     slen = len(batch_insts[0].sequence)
     batch_size = len(batch_insts)
     for b in range(1, batch_size):
@@ -58,6 +95,7 @@ def generate_tinsts_binary_label(batch_insts, vocab, if_evaluate=False):
             tinst.src_masks[b, index] = 1
         b += 1
     return tinst
+    '''
 
 
 def batch_variable_inst(insts, tagids, tag_logits, id2tag):
