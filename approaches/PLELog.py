@@ -181,8 +181,8 @@ if __name__ == '__main__':
 
     processor = PKLPreprocessor()
 
-    train, dev, test = processor.load_pkl(train_pkl='path/to/train.pkl', dev_pkl='path/to/val.pkl',
-        test_pkl='path/to/test.pkl')
+    train, dev, test = processor.load_pkl(train_pkl='../datasets/BGL/1_BGL_Splitted_Datasets/train.pkl', dev_pkl='../datasets/BGL/1_BGL_Splitted_Datasets/val.pkl',
+        test_pkl='../datasets/BGL/1_BGL_Splitted_Datasets/test.pkl')
 
     #processor = Preprocessor()
     #train, dev, test = processor.process(dataset=dataset, parsing=parser, cut_func=cut_by_613,
