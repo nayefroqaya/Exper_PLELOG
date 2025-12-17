@@ -206,7 +206,7 @@ if __name__ == '__main__':
 
     # Get counts for each label
     print(train_df['Label'].value_counts())
-    exit()
+   # exit()
     # ---------------- Load datasets ----------------
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
@@ -276,6 +276,7 @@ if __name__ == '__main__':
     print(f'Probabilistic labeling: TP={TP}, TN={TN}, FP={FP}, FN={FN}')
     print(f'Precision={p:.4f}, Recall={r:.4f}, F1={f:.4f}')
 
+
     # ---------------- Load Vocab and Initialize Model ----------------
     vocab = Vocab()
     vocab.load_from_dict(processor.embedding)
@@ -286,6 +287,63 @@ if __name__ == '__main__':
     best_model_file = os.path.join(output_model_dir, log_name + '_best.pt')
     last_model_file = os.path.join(output_model_dir, log_name + '_last.pt')
 
+    log = 'layer={}_hidden={}_epoch={}'.format(num_layer, lstm_hiddens, epochs)
+    best_model_file = os.path.join(output_model_dir, log + '_best.pt')
+    last_model_file = os.path.join(output_model_dir, log + '_last.pt')
+    if not os.path.exists(output_model_dir):
+        os.makedirs(output_model_dir)
+    if mode == 'train':
+        # Train
+        optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
+        bestClassifier = None
+        global_step = 0
+        bestF = 0
+        batch_num = int(np.ceil(len(labeled_train) / float(batch_size)))
+        start = time.strftime("%H:%M:%S")
+        for epoch in range(epochs):
+
+            plelog.model.train()
+
+            plelog.logger.info(
+                "Starting epoch: %d | phase: train | start time: %s | learning rate: %s" % (epoch + 1, start,
+                                                                                            optimizer.lr))
+            batch_iter = 0
+            correct_num, total_num = 0, 0
+            # start batch
+            for onebatch in data_iter(labeled_train, batch_size, True):
+                plelog.model.train()
+                tinst = generate_tinsts_binary_label(onebatch, vocab)
+                tinst.to_cuda(device)
+                loss = plelog.forward(tinst.inputs, tinst.targets)
+                loss_value = loss.data.cpu().numpy()
+                loss.backward()
+                if batch_iter % 100 == 0:
+                    plelog.logger.info(
+                        "Step:%d, Iter:%d, batch:%d, loss:%.2f" % (global_step, epoch, batch_iter, loss_value))
+                batch_iter += 1
+                if batch_iter % 1 == 0 or batch_iter == batch_num:
+                    nn.utils.clip_grad_norm_(filter(lambda p: p.requires_grad, plelog.model.parameters()), max_norm=1)
+                    optimizer.step()
+                    plelog.model.zero_grad()
+                    global_step += 1
+                if dev:
+                    if batch_iter % 500 == 0 or batch_iter == batch_num:
+                        plelog.logger.info('Testing on test set.')
+                        _, _, f = plelog.evaluate(dev)
+                        if f > bestF:
+                            plelog.logger.info("Exceed best f: history = %.2f, current = %.2f" % (bestF, f))
+                            torch.save(plelog.model.state_dict(), best_model_file)
+                            bestF = f
+            plelog.logger.info('Training epoch %d finished.' % epoch)
+            torch.save(plelog.model.state_dict(), last_model_file)
+
+        end_fit_ad = time.time()
+        fit_time_ad = end_fit_ad - start
+        plelog.logger.info("Final model Training runtime: %.2f minutes" % ((end_fit_ad - start) / 60))
+        exit()
+
+
+        '''
     # ---------------- Training ----------------
     if mode == 'train':
         optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
@@ -306,17 +364,26 @@ if __name__ == '__main__':
 
             # Save last model
             torch.save(plelog.model.state_dict(), last_model_file)
-
+    '''
     # ---------------- Evaluation ----------------
     if os.path.exists(last_model_file):
+        start_test = time.time()
         plelog.model.load_state_dict(torch.load(last_model_file))
         plelog.evaluate(test, threshold)
+        end_test = time.time()
+        plelog.logger.info("Final model prediction (testing) runtime: %.2f minutes" % ((end_test - start_test) / 60))
 
     if os.path.exists(best_model_file):
+        start_test = time.time()
         plelog.model.load_state_dict(torch.load(best_model_file))
         plelog.evaluate(test, threshold)
+        end_test = time.time()
+        plelog.logger.info("Best model prediction (testing) runtime: %.2f minutes" % ((end_test - start_test) / 60))
+
+
 
     print("All Finished")
+
 
 
 
@@ -495,13 +562,6 @@ if __name__ == '__main__':
                             bestF = f
             plelog.logger.info('Training epoch %d finished.' % epoch)
             torch.save(plelog.model.state_dict(), last_model_file)
-
-
-        end_time = time.time()  # <<< End timing here
-        elapsed_minutes = (end_time - start_time) / 60
-        plelog.logger.info("Nayef -----  Training finished in %.2f minutes" % elapsed_minutes)
-        exit()
-
 
 
     print('start main function ......')
