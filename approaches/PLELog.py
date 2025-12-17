@@ -186,6 +186,22 @@ if __name__ == '__main__':
     dev_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl'
     test_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl'
 
+    # Load the pickled DataFrames
+    with open(train_pkl, 'rb') as f:
+        train_df = pickle.load(f)
+
+    with open(dev_pkl, 'rb') as f:
+        dev_df = pickle.load(f)
+
+    with open(test_pkl, 'rb') as f:
+        test_df = pickle.load(f)
+
+    # Quick check
+    print("Train shape:", train_df.shape)
+    print("Dev shape:", dev_df.shape)
+    print("Test shape:", test_df.shape)
+    print(train_df.head())
+    exit()
     # ---------------- Load datasets ----------------
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
@@ -193,15 +209,7 @@ if __name__ == '__main__':
     # Check the first few rows of the DataFrame
     print(train.head())
 
-    # Inspect just the 'Label' column
-    print(train['Label'].head())  # first 5 labels
 
-    # See unique values in the 'Label' column
-    print(train['Label'].unique())
-
-    # Get counts for each label
-    print(train['Label'].value_counts())
-    exit()
 
     # ---------------- Build embeddings ----------------
     # Sequential_TF expects a dictionary {event_id: embedding_vector}
