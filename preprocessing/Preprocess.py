@@ -32,16 +32,13 @@ class PKLPreprocessor:
         instances = []
 
         for block_id, g in df.groupby('Node_block_id'):
-            sequence = g['EventId'].astype(int).tolist()
+            # Use string EventId directly
+            sequence = g['EventId'].astype(str).tolist()
 
             label = g['Label'].iloc[0]
             label = 'Normal' if label in [0, 'Normal'] else 'Anomalous'
 
-            inst = Instance(
-                id=block_id,
-                sequence=sequence,
-                label=label
-            )
+            inst = Instance(id=block_id, sequence=sequence, label=label)
             instances.append(inst)
 
         return instances
@@ -52,7 +49,7 @@ class PKLPreprocessor:
         """
         events = set()
         for inst in instances:
-            events.update(inst.sequence)
+            events.update(inst.sequence)  # strings now
 
         events = sorted(events)
         self.embedding = {e: idx for idx, e in enumerate(events)}
