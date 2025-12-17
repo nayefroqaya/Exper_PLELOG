@@ -201,6 +201,11 @@ if __name__ == '__main__':
     print("Dev shape:", dev_df.shape)
     print("Test shape:", test_df.shape)
     print(train_df.head())
+    # See unique values in the 'Label' column
+    print(train_df['Label'].unique())
+
+    # Get counts for each label
+    print(train_df['Label'].value_counts())
     exit()
     # ---------------- Load datasets ----------------
     processor = PKLPreprocessor()
