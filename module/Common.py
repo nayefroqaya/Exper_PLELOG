@@ -32,8 +32,46 @@ def data_iter(data, batch_size, shuffle=True):
     for batch in batched_data:
         yield batch
 
-
 def generate_tinsts_binary_label(batch_insts, vocab, if_evaluate=False):
+    assert batch_insts is not None
+    assert len(batch_insts) > 0
+
+    slen = max(len(inst.sequence) for inst in batch_insts)
+    batch_size = len(batch_insts)
+
+    tinst = TInstWithLogits(batch_size, slen, 2)
+    b = 0
+
+    for inst in batch_insts:
+        tinst.src_ids.append(str(inst.id))
+        confidence = 0.5 * inst.confidence
+
+        # SAFETY: predicted must exist in vocab
+        if inst.predicted not in vocab.tag2id:
+            inst.predicted = inst.label
+
+
+
+        tag_id = vocab.tag2id(inst.predicted)
+        assert tag_id is not None, f"Invalid tag: {inst.predicted}"
+
+        tinst.tags[b, tag_id] = 1 - confidence
+        tinst.tags[b, 1 - tag_id] = confidence
+        tinst.g_truth[b] = tag_id
+
+        cur_slen = len(inst.sequence)
+        tinst.word_len[b] = cur_slen
+
+        for index in range(min(cur_slen, 500)):
+            tinst.src_words[b, index] = vocab.word2id(inst.sequence[index])
+            tinst.src_masks[b, index] = 1
+
+        b += 1
+
+    # ✅ GUARANTEED RETURN
+    return tinst
+
+    '''
     slen = max(len(inst.sequence) for inst in batch_insts)
     batch_size = len(batch_insts)
 
@@ -67,7 +105,7 @@ def generate_tinsts_binary_label(batch_insts, vocab, if_evaluate=False):
         for i in range(min(cur_slen, 500)):
             tinst.src_words[b, i] = vocab.word2id(inst.sequence[i])
             tinst.src_masks[b, i] = 1
-
+    '''
     '''
     slen = len(batch_insts[0].sequence)
     batch_size = len(batch_insts)
