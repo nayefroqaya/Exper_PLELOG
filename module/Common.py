@@ -48,10 +48,8 @@ def generate_tinsts_binary_label(batch_insts, vocab, if_evaluate=False):
             confidence = 0.0
         else:
             tag_name = inst.predicted  # ✅ training
-            confidence = 0.5 * inst.confidence  # 🔑 SAFETY FIX (this is what you were missing)
+            confidence = 0.5 * inst.confidence
 
-        if inst.predicted not in vocab.tag2id:
-            inst.predicted = inst.label
         tag_id = vocab.tag2id(tag_name)
 
         # -------- SAFETY CHECK --------
