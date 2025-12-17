@@ -241,7 +241,6 @@ if __name__ == '__main__':
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
     # Check the first few rows of the DataFrame
-
     # ---------------- Build embeddings ----------------
     # Sequential_TF expects a dictionary {event_id: embedding_vector}
     all_event_ids = set()
@@ -306,6 +305,7 @@ if __name__ == '__main__':
     vocab.load_from_dict(processor.embedding)
 
     plelog = PLELog(vocab, num_layer, lstm_hiddens, processor.label2id)
+
     log_name = f'layer={num_layer}_hidden={lstm_hiddens}_epoch={epochs}'
     best_model_file = os.path.join(output_model_dir, log_name + '_best.pt')
     last_model_file = os.path.join(output_model_dir, log_name + '_last.pt')
