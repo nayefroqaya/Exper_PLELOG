@@ -9,42 +9,49 @@ class PKLPreprocessor:
     def __init__(self):
         self.train_event2idx = {}
         self.test_event2idx = {}
+        self.id2label = {}
+        self.label2id = {}
         self.embedding = None
-        self.id2label = {0: 'Normal', 1: 'Anomalous'}
-        self.label2id = {'Normal': 0, 'Anomalous': 1}
+        self.logger = None  # Optional: add logging if needed
 
     def load_pkl(self, train_pkl, dev_pkl=None, test_pkl=None):
-        # Load DataFrames
-        train_df = pickle.load(open(train_pkl, 'rb'))
-        dev_df   = pickle.load(open(dev_pkl, 'rb')) if dev_pkl else None
-        test_df  = pickle.load(open(test_pkl, 'rb'))
+        """Load train/dev/test datasets from PKL files and convert to Instance objects."""
+        train_df = pd.read_pickle(train_pkl)
+        dev_df = pd.read_pickle(dev_pkl) if dev_pkl else None
+        test_df = pd.read_pickle(test_pkl) if test_pkl else None
 
-        # Convert to Instance objects
         train = self._df_to_instances(train_df)
-        dev   = self._df_to_instances(dev_df) if dev_df is not None else []
-        test  = self._df_to_instances(test_df)
-
-        # Build EventId → embedding
-        self._build_embedding(train + dev + test)
-
-        # Update train/test event2idx mapping
-        self._update_event2idx(train, test)
+        dev = self._df_to_instances(dev_df) if dev_df is not None else []
+        test = self._df_to_instances(test_df) if test_df is not None else []
 
         return train, dev, test
 
     def _df_to_instances(self, df):
+        """
+        Convert a DataFrame into a list of Instance objects.
+        Groups by Node_block_id, preserves EventId sequence.
+        """
         instances = []
-        for block_id, g in df.groupby('Node_block_id'):
-            log_sequence = g['EventId'].astype(str).tolist()
-            label = g['Label'].iloc[0]
-            label = 'Normal' if label in [0, 'Normal'] else 'Anomalous'
 
-            inst = Instance(
-                block_id=block_id,
-                log_sequence=log_sequence,
-                label=label
-            )
+        if df is None or df.empty:
+            return instances
+
+        # Make sure EventId is treated as string (do not convert to int if not numeric)
+        df['EventId'] = df['EventId'].astype(str)
+
+        grouped = df.groupby('Node_block_id')
+        for block_id, g in grouped:
+            # Event sequence
+            sequence = g['EventId'].tolist()
+            # Label: if any row is 'Anomalous', the whole block is 'Anomalous'
+            label = 'Normal'
+            if (g['Label'] == 'Anomalous').any():
+                label = 'Anomalous'
+
+            # Create Instance using correct argument names
+            inst = Instance(block_id=block_id, log_sequence=sequence, label=label)
             instances.append(inst)
+
         return instances
 
     def _build_embedding(self, instances):
