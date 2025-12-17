@@ -213,7 +213,6 @@ if __name__ == '__main__':
     dev_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl'
     test_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl'
 
-
     # Load the pickled DataFrames
     with open(train_pkl, 'rb') as f:
         train_df = pickle.load(f)
@@ -229,20 +228,15 @@ if __name__ == '__main__':
     print("Dev shape:", dev_df.shape)
     print("Test shape:", test_df.shape)
     print(train_df.head())
-    # See unique values in the 'Label' column
-    print(train_df['Label'].unique())
+    print("Unique labels:", train_df['Label'].unique())
+    print("Label counts:\n", train_df['Label'].value_counts())
 
-    # Get counts for each label
-    print(train_df['Label'].value_counts())
-   # exit()
     # ---------------- Load datasets ----------------
- #   #label2id = {'Normal': 0, 'Anomaly': 1}
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
-    # Check the first few rows of the DataFrame
+
     # ---------------- Build embeddings ----------------
-    # Sequential_TF expects a dictionary {event_id: embedding_vector}
     all_event_ids = set()
     for inst in train + dev + test:
         all_event_ids.update(inst.sequence)
@@ -260,7 +254,7 @@ if __name__ == '__main__':
     for idx, inst in enumerate(test):
         inst.repr = test_reprs[idx]
 
-    # ---------------- Dimension reduction (optional) ----------------
+    # ---------------- Dimension reduction ----------------
     if reduce_dimension != -1:
         np.random.seed(0)
         train_reprs += np.random.normal(0, 1e-5, train_reprs.shape)
@@ -300,12 +294,14 @@ if __name__ == '__main__':
     p, r, f = get_precision_recall(TP, TN, FP, FN)
     print(f'Probabilistic labeling: TP={TP}, TN={TN}, FP={FP}, FN={FN}')
     print(f'Precision={p:.4f}, Recall={r:.4f}, F1={f:.4f}')
-    # ---------------- Load Vocab and Initialize Model ------------------
+
+    # ---------------- Load Vocab and Initialize Model ----------------
     vocab = Vocab()
     vocab.load_from_dict(processor.embedding)
 
     # Define label2id explicitly
     label2id = {'Normal': 0, 'Anomaly': 1}
+    id2tag = {v: k for k, v in label2id.items()}
 
     plelog = PLELog(vocab, num_layer, lstm_hiddens, label2id)
     plelog.anomaly_id = label2id['Anomaly']
@@ -314,62 +310,51 @@ if __name__ == '__main__':
     best_model_file = os.path.join(output_model_dir, log_name + '_best.pt')
     last_model_file = os.path.join(output_model_dir, log_name + '_last.pt')
 
-    log = 'layer={}_hidden={}_epoch={}'.format(num_layer, lstm_hiddens, epochs)
-    best_model_file = os.path.join(output_model_dir, log + '_best.pt')
-    last_model_file = os.path.join(output_model_dir, log + '_last.pt')
-
     if not os.path.exists(output_model_dir):
         os.makedirs(output_model_dir)
+
+    # ---------------- Training ----------------
     if mode == 'train':
-        # Train
         optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
-        bestClassifier = None
-        global_step = 0
         bestF = 0
+        global_step = 0
         batch_num = int(np.ceil(len(labeled_train) / float(batch_size)))
-        start = time.strftime("%H:%M:%S")
+        start_time = time.time()
+
         for epoch in range(epochs):
-
             plelog.model.train()
-
-            plelog.logger.info(
-                "Starting epoch: %d | phase: train | start time: %s | learning rate: %s" % (epoch + 1, start,
-                                                                                            optimizer.lr))
+            plelog.logger.info(f"Starting epoch: {epoch + 1} | learning rate: {optimizer.lr}")
             batch_iter = 0
-            correct_num, total_num = 0, 0
-            # start batch
             for onebatch in data_iter(labeled_train, batch_size, True):
-                plelog.model.train()
                 tinst = generate_tinsts_binary_label(onebatch, vocab)
                 tinst.to_device(device)
                 loss = plelog.forward(tinst.inputs, tinst.targets)
-                loss_value = loss.data.cpu().numpy()
+                loss_value = loss.item()
                 loss.backward()
+
                 if batch_iter % 100 == 0:
-                    plelog.logger.info(
-                        "Step:%d, Iter:%d, batch:%d, loss:%.2f" % (global_step, epoch, batch_iter, loss_value))
+                    plelog.logger.info(f"Step:{global_step}, Epoch:{epoch}, Batch:{batch_iter}, Loss:{loss_value:.4f}")
+
                 batch_iter += 1
-                if batch_iter % 1 == 0 or batch_iter == batch_num:
-                    nn.utils.clip_grad_norm_(filter(lambda p: p.requires_grad, plelog.model.parameters()), max_norm=1)
-                    optimizer.step()
-                    plelog.model.zero_grad()
-                    global_step += 1
+                nn.utils.clip_grad_norm_(filter(lambda p: p.requires_grad, plelog.model.parameters()), max_norm=1)
+                optimizer.step()
+                plelog.model.zero_grad()
+                global_step += 1
+
                 if dev:
                     if batch_iter % 500 == 0 or batch_iter == batch_num:
-                        plelog.logger.info('Testing on test set.')
-                        _, _, f = plelog.evaluate(dev)
-                        if f > bestF:
-                            plelog.logger.info("Exceed best f: history = %.2f, current = %.2f" % (bestF, f))
+                        plelog.logger.info('Evaluating on dev set...')
+                        _, _, f_val = plelog.evaluate(dev, threshold=args.threshold, id2tag=id2tag)
+                        if f_val > bestF:
+                            plelog.logger.info(f"Exceed best F1: history={bestF:.2f}, current={f_val:.2f}")
                             torch.save(plelog.model.state_dict(), best_model_file)
-                            bestF = f
-            plelog.logger.info('Training epoch %d finished.' % epoch)
+                            bestF = f_val
+
+            plelog.logger.info(f"Training epoch {epoch + 1} finished.")
             torch.save(plelog.model.state_dict(), last_model_file)
 
-        end_fit_ad = time.time()
-        fit_time_ad = end_fit_ad - start
-        plelog.logger.info("Final model Training runtime: %.2f minutes" % ((end_fit_ad - start) / 60))
-        exit()
-
+        end_fit_time = time.time()
+        plelog.logger.info(f"Total training runtime: {(end_fit_time - start_time) / 60:.2f} minutes")
 
         '''
     # ---------------- Training ----------------
