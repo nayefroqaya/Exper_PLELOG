@@ -355,8 +355,8 @@ if __name__ == '__main__':
                 if dev:
                     if batch_iter % 500 == 0 or batch_iter == batch_num:
                         plelog.logger.info('Evaluating on dev set...')
-                        #_, _, f_val = plelog.evaluate(dev, threshold=args.threshold, id2tag=id2tag)
-                        _, _, f_val = plelog.evaluate(dev, threshold=args.threshold)
+                        _, _, f_val = plelog.evaluate(dev, threshold=args.threshold, id2tag=id2tag)
+                        #_, _, f_val = plelog.evaluate(dev, threshold=args.threshold)
                         if f_val > bestF:
                             plelog.logger.info(f"Exceed best F1: history={bestF:.2f}, current={f_val:.2f}")
                             torch.save(plelog.model.state_dict(), best_model_file)
