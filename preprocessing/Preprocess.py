@@ -2,6 +2,7 @@ from CONSTANTS import *
 from entities.instances import Instance
 from preprocessing.dataloader.BGLLoader import BGLLoader
 from preprocessing.dataloader.HDFSLoader import HDFSLoader
+import pandas as pd
 
 
 
