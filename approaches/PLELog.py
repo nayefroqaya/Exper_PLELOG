@@ -53,24 +53,35 @@ class PLELog:
         return PLELog._logger
 
     def __init__(self, vocab, num_layer, hidden_size, label2id):
+        super(PLELog, self).__init__()
+
+        # ---------------- Labels ----------------
         self.label2id = label2id
 
-        # Make sure anomaly_id exists
-        if 'Anomaly' in label2id:
-            self.anomaly_id = label2id['Anomaly']
+        # Required labels check
+        required_labels = {'Normal', 'Anomaly'}
+        if not required_labels.issubset(label2id.keys()):
+            raise ValueError(f"label2id must contain {required_labels}, got {label2id}")
 
-        else:
-            raise ValueError(f"Unknown labels in label2id: {label2id}")
+        self.anomaly_id = label2id['Anomaly']
+        self.id2tag = {v: k for k, v in label2id.items()}
 
+        # ---------------- Model config ----------------
         self.vocab = vocab
         self.num_layer = num_layer
         self.hidden_size = hidden_size
+
         self.batch_size = 128
         self.test_batch_size = 1024
 
+        # ---------------- Model ----------------
         self.model = AttGRUModel(vocab, self.num_layer, self.hidden_size)
         self.model = self.model.to(device)
+
+        # ---------------- Loss ----------------
+        # NOTE: model outputs probabilities after softmax
         self.loss = nn.BCELoss()
+
     def forward(self, inputs, targets):
         tag_logits = self.model(inputs)
         tag_logits = F.softmax(tag_logits, dim=1)
@@ -344,7 +355,8 @@ if __name__ == '__main__':
                 if dev:
                     if batch_iter % 500 == 0 or batch_iter == batch_num:
                         plelog.logger.info('Evaluating on dev set...')
-                        _, _, f_val = plelog.evaluate(dev, threshold=args.threshold, id2tag=id2tag)
+                        #_, _, f_val = plelog.evaluate(dev, threshold=args.threshold, id2tag=id2tag)
+                        _, _, f_val = plelog.evaluate(dev, threshold=args.threshold)
                         if f_val > bestF:
                             plelog.logger.info(f"Exceed best F1: history={bestF:.2f}, current={f_val:.2f}")
                             torch.save(plelog.model.state_dict(), best_model_file)
