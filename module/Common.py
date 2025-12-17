@@ -47,12 +47,13 @@ def generate_tinsts_binary_label(batch_insts, vocab, if_evaluate=False):
         confidence = 0.5 * inst.confidence
 
         # SAFETY: predicted must exist in vocab
-        if inst.predicted not in vocab.tag2id:
-            inst.predicted = inst.label
-
-
-
+        #if inst.predicted not in vocab.tag2id:
+        #    inst.predicted = inst.label
         tag_id = vocab.tag2id(inst.predicted)
+        # SAFETY FALLBACK
+        if tag_id is None:
+            inst.predicted = inst.label
+            tag_id = vocab.tag2id(inst.predicted)
         assert tag_id is not None, f"Invalid tag: {inst.predicted}"
 
         tinst.tags[b, tag_id] = 1 - confidence
