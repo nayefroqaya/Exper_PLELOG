@@ -190,6 +190,18 @@ if __name__ == '__main__':
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
     print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
+    # Check the first few rows of the DataFrame
+    print(train_df.head())
+
+    # Inspect just the 'Label' column
+    print(train_df['Label'].head())  # first 5 labels
+
+    # See unique values in the 'Label' column
+    print(train_df['Label'].unique())
+
+    # Get counts for each label
+    print(train_df['Label'].value_counts())
+    exit()
 
     # ---------------- Build embeddings ----------------
     # Sequential_TF expects a dictionary {event_id: embedding_vector}
