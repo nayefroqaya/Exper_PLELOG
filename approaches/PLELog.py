@@ -181,10 +181,92 @@ if __name__ == '__main__':
     # Training, Validating and Testing instances.
     template_encoder = Template_TF_IDF_without_clean() if dataset == 'NC' else Simple_template_TF_IDF()
 
-    processor = PKLPreprocessor()
+    train_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/train_df.pkl'
+    dev_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl'
+    test_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl'
 
-    train, dev, test = processor.load_pkl(train_pkl='../datasets/BGL/1_BGL_Splitted_Datasets/train.pkl', dev_pkl='../datasets/BGL/1_BGL_Splitted_Datasets/val.pkl',
-        test_pkl='../datasets/BGL/1_BGL_Splitted_Datasets/test.pkl')
+    # ---------------- Load datasets ----------------
+    processor = PKLPreprocessor()
+    train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
+    print(f"Loaded {len(train)} train, {len(dev)} dev, {len(test)} test instances")
+
+    # ---------------- Sequential embedding ----------------
+    sequential_encoder = Sequential_TF(processor.embedding)
+    for dataset_split in [train, dev, test]:
+        reprs = sequential_encoder.present(dataset_split)
+        for idx, inst in enumerate(dataset_split):
+            inst.repr = reprs[idx]
+
+    # ---------------- Dimension reduction (FastICA) ----------------
+    if reduce_dimension != -1:
+        np.random.seed(0)
+        train_reprs = np.array([inst.repr for inst in train])
+        train_reprs += np.random.normal(0, 1e-5, train_reprs.shape)
+        scaler = StandardScaler()
+        train_reprs = scaler.fit_transform(train_reprs)
+        train_reprs = np.nan_to_num(train_reprs, nan=0.0, posinf=1e6, neginf=-1e6)
+
+        print(f"Start FastICA, target dimension: {reduce_dimension}")
+        transformer = FastICA(n_components=reduce_dimension)
+        train_reprs = transformer.fit_transform(train_reprs)
+        for idx, inst in enumerate(train):
+            inst.repr = train_reprs[idx]
+        print("FastICA finished.")
+
+    # ---------------- Probabilistic labeling ----------------
+    train_normal = [i for i, inst in enumerate(train) if inst.label == 'Normal']
+    normal_ids = train_normal[:int(0.5 * len(train_normal))]
+
+    label_generator = Probabilistic_Labeling(min_samples=min_samples, min_clust_size=min_cluster_size, res_file=None,
+        rand_state_file=None)
+    labeled_train = label_generator.auto_label(train, normal_ids)
+
+    # ---------------- Load vocab & initialize model ----------------
+    vocab = Vocab()
+    vocab.load_from_dict(processor.embedding)
+
+    plelog = AttGRUModel(vocab, num_layer=2, hidden_size=100).to(device)
+    loss_fn = nn.BCELoss()
+    optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.parameters()))
+
+    # ---------------- Training ----------------
+    if mode == 'train':
+        epochs = 5
+        bestF = 0
+        batch_num = int(np.ceil(len(labeled_train) / float(100)))
+
+        for epoch in range(epochs):
+            plelog.train()
+            for batch_idx, onebatch in enumerate(data_iter(labeled_train, 100, True)):
+                tinst = generate_tinsts_binary_label(onebatch, vocab)
+                tinst.to_device(device)
+
+                optimizer.zero_grad()
+                tag_logits = plelog(tinst.inputs)
+                tag_logits = torch.softmax(tag_logits, dim=1)
+                loss = loss_fn(tag_logits, tinst.targets)
+                loss.backward()
+                nn.utils.clip_grad_norm_(plelog.parameters(), max_norm=1)
+                optimizer.step()
+
+        torch.save(plelog.state_dict(), os.path.join(output_model_dir, 'plelog_last.pt'))
+
+    # ---------------- Testing ----------------
+    plelog.eval()
+    if os.path.exists(os.path.join(output_model_dir, 'plelog_last.pt')):
+        plelog.load_state_dict(torch.load(os.path.join(output_model_dir, 'plelog_last.pt')))
+        print("Evaluating on test set...")  # Implement plelog.evaluate(test, threshold) here
+
+
+
+
+
+
+
+    '''
+    # Load datasets
+    processor = PKLPreprocessor()
+    train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
 
     #processor = Preprocessor()
     #train, dev, test = processor.process(dataset=dataset, parsing=parser, cut_func=cut_by_613,
@@ -389,3 +471,4 @@ if __name__ == '__main__':
 
     #print(f"labeling  completed in {fit_time:.4f} seconds")
     #print(f"features  completed in {fit_time_features:.4f} seconds")
+    '''
