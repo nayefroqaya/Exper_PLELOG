@@ -9,6 +9,7 @@ from CONSTANTS import *
 print("Imported _2 ")
 import time
 from utils.common import get_precision_recall
+import shutil
 
 from sklearn.decomposition import FastICA
 from representations.templates.statistics import Simple_template_TF_IDF, Template_TF_IDF_without_clean
