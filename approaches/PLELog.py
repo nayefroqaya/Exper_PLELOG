@@ -197,6 +197,17 @@ if __name__ == '__main__':
     threshold = args.threshold
 
     # ---------------- Paths ----------------
+    # Mark results saving directories.
+    save_dir = os.path.join(PROJECT_ROOT, 'outputs')
+    base = os.path.join(PROJECT_ROOT, 'datasets/' + dataset)
+    output_model_dir = os.path.join(save_dir, 'models/PLELog/' + dataset + '_' + parser + '/model')
+    output_res_dir = os.path.join(save_dir, 'results/PLELog/' + dataset + '_' + parser + '/detect_res')
+    prob_label_res_file = os.path.join(save_dir,
+                                       'results/PLELog/' + dataset + '_' + parser +
+                                       '/prob_label_res/mcs-' + str(min_cluster_size) + '_ms-' + str(min_samples))
+    rand_state = os.path.join(save_dir,
+                              'results/PLELog/' + dataset + '_' + parser +
+                              '/prob_label_res/random_state')
     save_dir = os.path.join(PROJECT_ROOT, 'outputs')
     output_model_dir = os.path.join(
         save_dir, f'models/PLELog/{dataset}_{parser}/model'
