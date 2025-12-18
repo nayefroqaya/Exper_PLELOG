@@ -130,22 +130,20 @@ class PLELog:
 
     def evaluate(self, instances, threshold=0.5):
         self.logger.info('Start evaluating by threshold %.3f' % threshold)
+
         with torch.no_grad():
             self.model.eval()
-            globalBatchNum = 0
             TP, TN, FP, FN = 0, 0, 0, 0
-            tag_correct, tag_total = 0, 0
+
             for onebatch in data_iter(instances, self.test_batch_size, False):
-                tinst = generate_tinsts_binary_label(onebatch, vocab, False)
-#                tinst.to_cuda(device)
+                tinst = generate_tinsts_binary_label(onebatch, self.vocab, False)
                 tinst.to_device(device)
 
-                self.model.eval()
                 pred_tags, tag_logits = self.predict(tinst.inputs, threshold)
-                for inst, bmatch in batch_variable_inst(onebatch, pred_tags, tag_logits, processor.id2tag):
-                    tag_total += 1
+
+                for inst, bmatch in batch_variable_inst(onebatch, pred_tags, tag_logits, self.id2tag):
+
                     if bmatch:
-                        tag_correct += 1
                         if inst.label == 'Normal':
                             TN += 1
                         else:
@@ -155,18 +153,16 @@ class PLELog:
                             FP += 1
                         else:
                             FN += 1
-                globalBatchNum += 1
+
             self.logger.info('TP: %d, TN: %d, FN: %d, FP: %d' % (TP, TN, FN, FP))
-            if TP + FP != 0:
+
+            if TP + FP > 0:
                 precision = 100 * TP / (TP + FP)
                 recall = 100 * TP / (TP + FN)
                 f = 2 * precision * recall / (precision + recall)
-                end = time.time()
-                self.logger.info('Precision = %d / %d = %.4f, Recall = %d / %d = %.4f F1 score = %.4f'
-                                 % (TP, (TP + FP), precision, TP, (TP + FN), recall, f))
             else:
-                self.logger.info('Precision is 0 and therefore f is 0')
-                precision, recall, f = 0, 0, 0
+                precision = recall = f = 0
+
         return precision, recall, f
 
 
@@ -355,8 +351,8 @@ if __name__ == '__main__':
                 if dev:
                     if batch_iter % 500 == 0 or batch_iter == batch_num:
                         plelog.logger.info('Evaluating on dev set...')
-                        _, _, f_val = plelog.evaluate(dev, threshold=args.threshold, id2tag=id2tag)
-                        #_, _, f_val = plelog.evaluate(dev, threshold=args.threshold)
+                        #_, _, f_val = plelog.evaluate(dev, threshold=args.threshold, id2tag=id2tag)
+                        _, _, f_val = plelog.evaluate(dev, threshold=args.threshold)
                         if f_val > bestF:
                             plelog.logger.info(f"Exceed best F1: history={bestF:.2f}, current={f_val:.2f}")
                             torch.save(plelog.model.state_dict(), best_model_file)
