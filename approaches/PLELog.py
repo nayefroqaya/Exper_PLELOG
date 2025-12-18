@@ -191,6 +191,9 @@ if __name__ == '__main__':
     dataset = args.dataset
     parser = args.parser
     mode = args.mode
+    min_cluster_size = args.min_cluster_size
+    min_samples = args.min_samples
+    reduce_dimension = args.reduce_dimension
     threshold = args.threshold
 
     # ---------------- Paths ----------------
