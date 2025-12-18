@@ -197,6 +197,188 @@ if __name__ == '__main__':
     threshold = args.threshold
 
     # ---------------- Paths ----------------
+    PROJECT_ROOT = '.'  # adjust as needed
+    save_dir = os.path.join(PROJECT_ROOT, 'outputs')
+    output_model_dir = os.path.join(save_dir, f'models/PLELog/{dataset}_{parser}/model')
+    prob_label_res_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
+    rand_state = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
+    os.makedirs(output_model_dir, exist_ok=True)
+
+    # ---------------- Load PKL ----------------
+    train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
+    dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
+    test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
+
+    processor = PKLPreprocessor()
+    train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
+
+    print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
+
+    # ---------------- Embeddings ----------------
+    all_event_ids = set()
+    for inst in train + dev + test:
+        all_event_ids.update(inst.sequence)
+
+    embedding_dim = 50
+    processor.embedding = {eid: np.random.rand(embedding_dim) for eid in all_event_ids}
+
+    # ---------------- Sequence representation ----------------
+    encoder = Sequential_TF(processor.embedding)
+    for inst, vec in zip(train, encoder.present(train)):
+        inst.repr = vec
+    for inst, vec in zip(test, encoder.present(test)):
+        inst.repr = vec
+
+    # ---------------- Dimension Reduction (FastICA) ----------------
+    train_reprs = np.array([inst.repr for inst in train])
+    test_reprs  = np.array([inst.repr for inst in test])
+
+    transformer = None
+    if reduce_dimension != -1:
+        start_time = time.time()
+        print(f"Start FastICA, target dimension: {reduce_dimension}")
+
+        # Add small noise to avoid singular matrix issues
+        train_reprs += np.random.normal(0, 1e-5, train_reprs.shape)
+
+        # Standardize
+        scaler = StandardScaler()
+        train_reprs = scaler.fit_transform(train_reprs)
+        train_reprs = np.nan_to_num(train_reprs, nan=0.0, posinf=1e6, neginf=-1e6)
+
+        # Fit ICA on train
+        transformer = FastICA(n_components=reduce_dimension, random_state=0)
+        train_reprs = transformer.fit_transform(train_reprs)
+
+        # Assign back
+        for idx, inst in enumerate(train):
+            inst.repr = train_reprs[idx]
+
+        # Transform test set
+        test_reprs = scaler.transform(test_reprs)
+        test_reprs = transformer.transform(test_reprs)
+        for idx, inst in enumerate(test):
+            inst.repr = test_reprs[idx]
+
+        print(f"Finished FastICA in {time.time() - start_time:.2f} seconds")
+
+    # ---------------- Probabilistic Labeling ----------------
+    train_normal = [i for i, inst in enumerate(train) if inst.label == 'Normal']
+    normal_ids = train_normal[:len(train_normal) // 2]
+
+    label_generator = Probabilistic_Labeling(
+        min_samples=min_samples,
+        min_clust_size=min_cluster_size,
+        res_file=prob_label_res_file,
+        rand_state_file=rand_state
+    )
+    labeled_train = label_generator.auto_label(train, normal_ids)
+
+    # ---------------- Model ----------------
+    vocab = Vocab()
+    vocab.load_from_dict(processor.embedding)
+
+    label2id = {'Normal': 0, 'Anomaly': 1}
+    plelog = PLELog(vocab, num_layer, lstm_hiddens, label2id)
+    plelog.anomaly_id = label2id['Anomaly']
+
+    best_model_file = os.path.join(output_model_dir, 'best.pt')
+    last_model_file = os.path.join(output_model_dir, 'last.pt')
+
+    # ========================= TRAIN =========================
+    if mode == 'train':
+        optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
+        bestF = 0.0
+        start_train = time.time()
+
+        for epoch in range(epochs):
+            plelog.model.train()
+            for onebatch in data_iter(labeled_train, batch_size, True):
+                tinst = generate_tinsts_binary_label(onebatch, vocab)
+                tinst.to_device(device)
+
+                loss = plelog.forward(tinst.inputs, tinst.targets)
+                loss.backward()
+
+                nn.utils.clip_grad_norm_(plelog.model.parameters(), max_norm=1)
+                optimizer.step()
+                plelog.model.zero_grad()
+
+            # ---- DEV evaluation ----
+            if dev:
+                p_dev, r_dev, f_dev = plelog.evaluate(dev, threshold)
+                print(f"[DEV] Epoch {epoch+1} | F1={f_dev:.4f}")
+
+                if f_dev > bestF:
+                    bestF = f_dev
+                    torch.save(plelog.model.state_dict(), best_model_file)
+
+        torch.save(plelog.model.state_dict(), last_model_file)
+        train_time = (time.time() - start_train) / 60
+        print(f"\nTotal training time: {train_time:.2f} minutes")
+
+    # ========================= TEST =========================
+    results = {}
+
+    if os.path.exists(last_model_file):
+        plelog.model.load_state_dict(torch.load(last_model_file))
+        start = time.time()
+        p, r, f = plelog.evaluate(test, threshold)
+        runtime = (time.time() - start) / 60
+        results['LAST'] = (p, r, f, runtime)
+
+    if os.path.exists(best_model_file):
+        plelog.model.load_state_dict(torch.load(best_model_file))
+        start = time.time()
+        p, r, f = plelog.evaluate(test, threshold)
+        runtime = (time.time() - start) / 60
+        results['BEST'] = (p, r, f, runtime)
+
+    # ========================= COMPARE =========================
+    print("\n=========== FINAL TEST RESULTS ===========")
+    for k, (p, r, f, t) in results.items():
+        print(f"{k} MODEL | Precision={p:.4f} Recall={r:.4f} F1={f:.4f} Time={t:.2f} min")
+
+    winner = max(results.items(), key=lambda x: x[1][2])[0]
+    print(f"\n🏆 Best model on TEST set: {winner}")
+    print("=========================================")
+    print("All Finished ✅")
+
+
+
+
+
+    '''
+    print('start main function ......')
+
+    RESET = colorama.Fore.RESET
+
+    # ---------------- Device setup (CPU ONLY) ----------------
+    device = torch.device("cpu")
+    torch.backends.cudnn.enabled = False
+    torch.backends.cuda.enabled = False
+    print(f"Using device: CPU only{RESET}")
+
+    # ---------------- Arguments ----------------
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--dataset', default='BGL', type=str)
+    argparser.add_argument('--mode', default='test', type=str)
+    argparser.add_argument('--parser', default='IBM', type=str)
+    argparser.add_argument('--min_cluster_size', type=int, default=100)
+    argparser.add_argument('--min_samples', type=int, default=100)
+    argparser.add_argument('--reduce_dimension', type=int, default=100)
+    argparser.add_argument('--threshold', type=float, default=0.5)
+    args, _ = argparser.parse_known_args()
+
+    dataset = args.dataset
+    parser = args.parser
+    mode = args.mode
+    min_cluster_size = args.min_cluster_size
+    min_samples = args.min_samples
+    reduce_dimension = args.reduce_dimension
+    threshold = args.threshold
+
+    # ---------------- Paths ----------------
     # Mark results saving directories.
     save_dir = os.path.join(PROJECT_ROOT, 'outputs')
     base = os.path.join(PROJECT_ROOT, 'datasets/' + dataset)
@@ -327,6 +509,7 @@ if __name__ == '__main__':
     print("=========================================")
 
     print("All Finished ✅")
+    '''
 
 
 
