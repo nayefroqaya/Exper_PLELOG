@@ -271,14 +271,24 @@ if __name__ == '__main__':
                                        f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
     rand_state_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
 
-    # Remove old files/folders if they exist
+    # Remove old probabilistic labeling results safely
     if os.path.exists(prob_label_res_file):
-        shutil.rmtree(prob_label_res_file)
-        print(f"Removed old probabilistic labels folder: {prob_label_res_file}")
+        if os.path.isdir(prob_label_res_file):
+            shutil.rmtree(prob_label_res_file)
+            print(f"Removed old probabilistic labels folder: {prob_label_res_file}")
+        else:
+            os.remove(prob_label_res_file)
+            print(f"Removed old probabilistic labels file: {prob_label_res_file}")
 
-    if os.path.exists(rand_state_file):
-        os.remove(rand_state_file)
-        print(f"Removed old random state file: {rand_state_file}")
+    # Remove random state file if it exists
+    if os.path.exists(rand_state):
+        if os.path.isdir(rand_state):
+            shutil.rmtree(rand_state)
+            print(f"Removed old random state folder: {rand_state}")
+        else:
+            os.remove(rand_state)
+            print(f"Removed old random state file: {rand_state}")
+
 
     label_generator = Probabilistic_Labeling(
         min_samples=min_samples,
