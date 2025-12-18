@@ -266,6 +266,20 @@ if __name__ == '__main__':
     train_normal = [i for i, inst in enumerate(train) if inst.label == 'Normal']
     normal_ids = train_normal[:len(train_normal) // 2]
 
+    # Paths to old probabilistic labeling results
+    prob_label_res_file = os.path.join(save_dir,
+                                       f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
+    rand_state_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
+
+    # Remove old files/folders if they exist
+    if os.path.exists(prob_label_res_file):
+        shutil.rmtree(prob_label_res_file)
+        print(f"Removed old probabilistic labels folder: {prob_label_res_file}")
+
+    if os.path.exists(rand_state_file):
+        os.remove(rand_state_file)
+        print(f"Removed old random state file: {rand_state_file}")
+
     label_generator = Probabilistic_Labeling(
         min_samples=min_samples,
         min_clust_size=min_cluster_size,
