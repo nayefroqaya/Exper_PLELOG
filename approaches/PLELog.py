@@ -205,9 +205,9 @@ if __name__ == '__main__':
     os.makedirs(output_model_dir, exist_ok=True)
 
     # ---------------- Load PKL ----------------
-    train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
-    dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
-    test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
+    train_pkl = f'../datasets/{dataset}/2_{dataset}_Splitted_Datasets/train_df.pkl'
+    dev_pkl   = f'../datasets/{dataset}/2_{dataset}_Splitted_Datasets/val_df.pkl'
+    test_pkl  = f'../datasets/{dataset}/2_{dataset}_Splitted_Datasets/test_df.pkl'
 
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
