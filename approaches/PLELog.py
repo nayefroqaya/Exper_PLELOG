@@ -165,142 +165,157 @@ class PLELog:
 
         return precision, recall, f
 
-    if __name__ == '__main__':
-        print('start main function ......')
 
-        RESET = colorama.Fore.RESET
+if __name__ == '__main__':
+    print('start main function ......')
 
-        # ---------------- Device setup (CPU ONLY) ----------------
-        device = torch.device("cpu")
-        torch.backends.cudnn.enabled = False
-        torch.backends.cuda.enabled = False
-        print(f"Using device: CPU only{RESET}")
+    RESET = colorama.Fore.RESET
 
-        # ---------------- Arguments ----------------
-        argparser = argparse.ArgumentParser()
-        argparser.add_argument('--dataset', default='BGL', type=str)
-        argparser.add_argument('--mode', default='train', type=str)
-        argparser.add_argument('--parser', default='IBM', type=str)
-        argparser.add_argument('--min_cluster_size', type=int, default=100)
-        argparser.add_argument('--min_samples', type=int, default=100)
-        argparser.add_argument('--reduce_dimension', type=int, default=100)
-        argparser.add_argument('--threshold', type=float, default=0.5)
-        args, _ = argparser.parse_known_args()
+    # ---------------- Device setup (CPU ONLY) ----------------
+    device = torch.device("cpu")
+    torch.backends.cudnn.enabled = False
+    torch.backends.cuda.enabled = False
+    print(f"Using device: CPU only{RESET}")
 
-        dataset = args.dataset
-        parser = args.parser
-        mode = args.mode
-        threshold = args.threshold
+    # ---------------- Arguments ----------------
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--dataset', default='BGL', type=str)
+    argparser.add_argument('--mode', default='train', type=str)
+    argparser.add_argument('--parser', default='IBM', type=str)
+    argparser.add_argument('--min_cluster_size', type=int, default=100)
+    argparser.add_argument('--min_samples', type=int, default=100)
+    argparser.add_argument('--reduce_dimension', type=int, default=100)
+    argparser.add_argument('--threshold', type=float, default=0.5)
+    args, _ = argparser.parse_known_args()
 
-        # ---------------- Paths ----------------
-        save_dir = os.path.join(PROJECT_ROOT, 'outputs')
-        output_model_dir = os.path.join(save_dir, f'models/PLELog/{dataset}_{parser}/model')
+    dataset = args.dataset
+    parser = args.parser
+    mode = args.mode
+    threshold = args.threshold
 
-        os.makedirs(output_model_dir, exist_ok=True)
+    # ---------------- Paths ----------------
+    save_dir = os.path.join(PROJECT_ROOT, 'outputs')
+    output_model_dir = os.path.join(
+        save_dir, f'models/PLELog/{dataset}_{parser}/model'
+    )
 
-        # ---------------- Load PKL ----------------
-        train_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/train_df.pkl'
-        dev_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl'
-        test_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl'
+    os.makedirs(output_model_dir, exist_ok=True)
 
-        processor = PKLPreprocessor()
-        train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
+    # ---------------- Load PKL ----------------
+    train_pkl = '../datasets/BGL/1_BGL_Splitted_Datasets/train_df.pkl'
+    dev_pkl   = '../datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl'
+    test_pkl  = '../datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl'
 
-        print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
+    processor = PKLPreprocessor()
+    train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
 
-        # ---------------- Embeddings ----------------
-        all_event_ids = set()
-        for inst in train + dev + test:
-            all_event_ids.update(inst.sequence)
+    print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
 
-        processor.embedding = {eid: np.random.rand(50) for eid in all_event_ids}
+    # ---------------- Embeddings ----------------
+    all_event_ids = set()
+    for inst in train + dev + test:
+        all_event_ids.update(inst.sequence)
 
-        # ---------------- Sequence representation ----------------
-        encoder = Sequential_TF(processor.embedding)
-        for inst, vec in zip(train, encoder.present(train)):
-            inst.repr = vec
-        for inst, vec in zip(test, encoder.present(test)):
-            inst.repr = vec
+    processor.embedding = {eid: np.random.rand(50) for eid in all_event_ids}
 
-        # ---------------- Probabilistic labeling ----------------
-        train_normal = [i for i, inst in enumerate(train) if inst.label == 'Normal']
-        normal_ids = train_normal[:len(train_normal) // 2]
+    # ---------------- Sequence representation ----------------
+    encoder = Sequential_TF(processor.embedding)
+    for inst, vec in zip(train, encoder.present(train)):
+        inst.repr = vec
+    for inst, vec in zip(test, encoder.present(test)):
+        inst.repr = vec
 
-        label_generator = Probabilistic_Labeling(min_samples=args.min_samples, min_clust_size=args.min_cluster_size)
-        labeled_train = label_generator.auto_label(train, normal_ids)
+    # ---------------- Probabilistic labeling ----------------
+    train_normal = [i for i, inst in enumerate(train) if inst.label == 'Normal']
+    normal_ids = train_normal[:len(train_normal) // 2]
 
-        # ---------------- Model ----------------
-        vocab = Vocab()
-        vocab.load_from_dict(processor.embedding)
+    #label_generator = Probabilistic_Labeling(
+    #    min_samples=args.min_samples,
+    #    min_clust_size=args.min_cluster_size
+    #)
+    label_generator = Probabilistic_Labeling(min_samples=min_samples, min_clust_size=min_cluster_size,
+                                             res_file=prob_label_res_file, rand_state_file=rand_state)
+    labeled_train = label_generator.auto_label(train, normal_ids)
 
-        label2id = {'Normal': 0, 'Anomaly': 1}
-        plelog = PLELog(vocab, num_layer, lstm_hiddens, label2id)
-        plelog.anomaly_id = label2id['Anomaly']
+    # ---------------- Model ----------------
+    vocab = Vocab()
+    vocab.load_from_dict(processor.embedding)
 
-        best_model_file = os.path.join(output_model_dir, 'best.pt')
-        last_model_file = os.path.join(output_model_dir, 'last.pt')
+    label2id = {'Normal': 0, 'Anomaly': 1}
+    plelog = PLELog(vocab, num_layer, lstm_hiddens, label2id)
+    plelog.anomaly_id = label2id['Anomaly']
 
-        # ========================= TRAIN =========================
-        if mode == 'train':
-            optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
+    best_model_file = os.path.join(output_model_dir, 'best.pt')
+    last_model_file = os.path.join(output_model_dir, 'last.pt')
 
-            bestF = 0.0
-            start_train = time.time()
+    # ========================= TRAIN =========================
+    if mode == 'train':
+        optimizer = Optimizer(
+            filter(lambda p: p.requires_grad, plelog.model.parameters())
+        )
 
-            for epoch in range(epochs):
-                plelog.model.train()
-                for onebatch in data_iter(labeled_train, batch_size, True):
-                    tinst = generate_tinsts_binary_label(onebatch, vocab)
-                    tinst.to_device(device)
+        bestF = 0.0
+        start_train = time.time()
 
-                    loss = plelog.forward(tinst.inputs, tinst.targets)
-                    loss.backward()
+        for epoch in range(epochs):
+            plelog.model.train()
+            for onebatch in data_iter(labeled_train, batch_size, True):
+                tinst = generate_tinsts_binary_label(onebatch, vocab)
+                tinst.to_device(device)
 
-                    nn.utils.clip_grad_norm_(plelog.model.parameters(), max_norm=1)
-                    optimizer.step()
-                    plelog.model.zero_grad()
+                loss = plelog.forward(tinst.inputs, tinst.targets)
+                loss.backward()
 
-                # ---- DEV evaluation ----
-                if dev:
-                    p_dev, r_dev, f_dev = plelog.evaluate(dev, threshold)
-                    print(f"[DEV] Epoch {epoch + 1} | F1={f_dev:.4f}")
+                nn.utils.clip_grad_norm_(
+                    plelog.model.parameters(), max_norm=1
+                )
+                optimizer.step()
+                plelog.model.zero_grad()
 
-                    if f_dev > bestF:
-                        bestF = f_dev
-                        torch.save(plelog.model.state_dict(), best_model_file)
+            # ---- DEV evaluation ----
+            if dev:
+                p_dev, r_dev, f_dev = plelog.evaluate(dev, threshold)
+                print(f"[DEV] Epoch {epoch+1} | F1={f_dev:.4f}")
 
-            torch.save(plelog.model.state_dict(), last_model_file)
+                if f_dev > bestF:
+                    bestF = f_dev
+                    torch.save(plelog.model.state_dict(), best_model_file)
 
-            train_time = (time.time() - start_train) / 60
-            print(f"\nTotal training time: {train_time:.2f} minutes")
+        torch.save(plelog.model.state_dict(), last_model_file)
 
-        # ========================= TEST =========================
-        results = {}
+        train_time = (time.time() - start_train) / 60
+        print(f"\nTotal training time: {train_time:.2f} minutes")
 
-        if os.path.exists(last_model_file):
-            plelog.model.load_state_dict(torch.load(last_model_file))
-            start = time.time()
-            p, r, f = plelog.evaluate(test, threshold)
-            runtime = (time.time() - start) / 60
-            results['LAST'] = (p, r, f, runtime)
+    # ========================= TEST =========================
+    results = {}
 
-        if os.path.exists(best_model_file):
-            plelog.model.load_state_dict(torch.load(best_model_file))
-            start = time.time()
-            p, r, f = plelog.evaluate(test, threshold)
-            runtime = (time.time() - start) / 60
-            results['BEST'] = (p, r, f, runtime)
+    if os.path.exists(last_model_file):
+        plelog.model.load_state_dict(torch.load(last_model_file))
+        start = time.time()
+        p, r, f = plelog.evaluate(test, threshold)
+        runtime = (time.time() - start) / 60
+        results['LAST'] = (p, r, f, runtime)
 
-        # ========================= COMPARE =========================
-        print("\n=========== FINAL TEST RESULTS ===========")
-        for k, (p, r, f, t) in results.items():
-            print(f"{k} MODEL | Precision={p:.4f} Recall={r:.4f} F1={f:.4f} Time={t:.2f} min")
+    if os.path.exists(best_model_file):
+        plelog.model.load_state_dict(torch.load(best_model_file))
+        start = time.time()
+        p, r, f = plelog.evaluate(test, threshold)
+        runtime = (time.time() - start) / 60
+        results['BEST'] = (p, r, f, runtime)
 
-        winner = max(results.items(), key=lambda x: x[1][2])[0]
-        print(f"\n🏆 Best model on TEST set: {winner}")
-        print("=========================================")
+    # ========================= COMPARE =========================
+    print("\n=========== FINAL TEST RESULTS ===========")
+    for k, (p, r, f, t) in results.items():
+        print(f"{k} MODEL | Precision={p:.4f} Recall={r:.4f} F1={f:.4f} Time={t:.2f} min")
 
-        print("All Finished ✅")
+    winner = max(results.items(), key=lambda x: x[1][2])[0]
+    print(f"\n🏆 Best model on TEST set: {winner}")
+    print("=========================================")
+
+    print("All Finished ✅")
+
+
+
 
     '''
     print('start main function ......')
