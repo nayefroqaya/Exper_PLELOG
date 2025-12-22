@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='BGL', type=str)
+    argparser.add_argument('--dataset', default='TH_1G', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -206,9 +206,9 @@ if __name__ == '__main__':
     os.makedirs(output_model_dir, exist_ok=True)
 
     # ---------------- Load PKL ----------------
-    train_pkl = f'../datasets/{dataset}/2_{dataset}_Splitted_Datasets/train_df.pkl'
-    dev_pkl   = f'../datasets/{dataset}/2_{dataset}_Splitted_Datasets/val_df.pkl'
-    test_pkl  = f'../datasets/{dataset}/2_{dataset}_Splitted_Datasets/test_df.pkl'
+    train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
+    dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
+    test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
 
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
@@ -378,7 +378,7 @@ if __name__ == '__main__':
 
     RESET = colorama.Fore.RESET
 
-    # ---------------- Device setup (CPU ONLY) ----------------
+     # ---------------- Device setup (CPU ONLY) ----------------
     device = torch.device("cpu")
     torch.backends.cudnn.enabled = False
     torch.backends.cuda.enabled = False
