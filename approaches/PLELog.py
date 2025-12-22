@@ -311,6 +311,7 @@ if __name__ == '__main__':
     last_model_file = os.path.join(output_model_dir, 'last.pt')
 
     # ========================= TRAIN =========================
+    Estimated_training_time=0.0
     if mode == 'train':
         optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
         bestF = 0.0
@@ -340,11 +341,11 @@ if __name__ == '__main__':
 
         torch.save(plelog.model.state_dict(), last_model_file)
         train_time = (time.time() - start_train) / 60
-        print(f"\nTotal training time: {train_time:.2f} minutes")
+        Estimated_training_time=train_time
+        print(f"\nTotal training time: {Estimated_training_time:.2f} minutes")
 
     # ========================= TEST =========================
     results = {}
-
     if os.path.exists(last_model_file):
         plelog.model.load_state_dict(torch.load(last_model_file))
         start = time.time()
@@ -367,6 +368,8 @@ if __name__ == '__main__':
     winner = max(results.items(), key=lambda x: x[1][2])[0]
     print(f"\n🏆 Best model on TEST set: {winner}")
     print("=========================================")
+    print(f"\nTotal training time: {Estimated_training_time:.2f} minutes")
+
     print("All Finished ✅")
 
 
