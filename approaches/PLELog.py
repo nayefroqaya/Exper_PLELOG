@@ -215,7 +215,6 @@ if __name__ == '__main__':
     # ---------------- Paths ----------------
     PROJECT_ROOT = '.'  # adjust as needed
     save_dir = os.path.join(PROJECT_ROOT, 'outputs')
-    clear_folder(save_dir)
     output_model_dir = os.path.join(save_dir, f'models/PLELog/{dataset}_{parser}/model')
     prob_label_res_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
     rand_state = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
@@ -225,6 +224,7 @@ if __name__ == '__main__':
     train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
     dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
     test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
+    PLELog.clear_folder(save_dir)
 
     processor = PKLPreprocessor()
     train, dev, test = processor.load_pkl(dataset, train_pkl, dev_pkl, test_pkl)
