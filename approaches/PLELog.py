@@ -220,6 +220,7 @@ if __name__ == '__main__':
     #rand_state = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
     #os.makedirs(output_model_dir, exist_ok=True)
     # ---------------- Paths ----------------
+    # Base outputs directory
     save_dir = os.path.join(PROJECT_ROOT, 'outputs')
 
     # Base experiment directory
@@ -227,8 +228,11 @@ if __name__ == '__main__':
 
     # Sub-directories
     output_model_dir = os.path.join(exp_dir, 'model')
-    prob_label_res_file = os.path.join(exp_dir, 'prob_label_res', f'mcs-{min_cluster_size}_ms-{min_samples}')
-    rand_state = os.path.join(exp_dir, 'prob_label_res', 'random_state')
+    prob_label_res_dir = os.path.join(exp_dir, 'prob_label_res')
+
+    # CREATE REQUIRED DIRECTORIES
+    os.makedirs(output_model_dir, exist_ok=True)
+    os.makedirs(prob_label_res_dir, exist_ok=True)
 
     # ---------------- Create directories ----------------
     os.makedirs(output_model_dir, exist_ok=True)
