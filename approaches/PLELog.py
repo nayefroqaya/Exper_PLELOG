@@ -211,7 +211,7 @@ if __name__ == '__main__':
     test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
 
     processor = PKLPreprocessor()
-    train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
+    train, dev, test = processor.load_pkl(dataset, train_pkl, dev_pkl, test_pkl)
 
     print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
 

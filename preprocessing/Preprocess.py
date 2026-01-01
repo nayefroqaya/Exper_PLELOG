@@ -15,7 +15,7 @@ class PKLPreprocessor:
         self.embedding = None
         self.logger = None  # Optional: add logging if needed
 
-    def load_pkl(self, train_pkl, dev_pkl=None, test_pkl=None):
+    def load_pkl(self, dataset, train_pkl, dev_pkl=None, test_pkl=None):
         """Load train/dev/test datasets from PKL files and convert to Instance objects."""
         train_df = pd.read_pickle(train_pkl)
         dev_df = pd.read_pickle(dev_pkl) if dev_pkl else None
@@ -49,6 +49,8 @@ class PKLPreprocessor:
         if test_df is not None:
             print("Test labels:", test_df['Label'].unique())
 
+
+        print(dataset)
         exit()
 
         train = self._df_to_instances(train_df)
