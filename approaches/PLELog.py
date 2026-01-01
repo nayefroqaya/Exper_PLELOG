@@ -180,7 +180,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='TH_1G', type=str)
+    argparser.add_argument('--dataset', default='HDFS', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -214,14 +214,14 @@ if __name__ == '__main__':
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
 
     print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
-    print(datasets)
-    print("Train labels:", train_df['label'].unique())
+    print(dataset)
+    print("Train labels:", train['label'].unique())
 
-    if dev_df is not None:
-        print("Dev labels:", dev_df['label'].unique())
+    if dev is not None:
+        print("Dev labels:", dev['label'].unique())
 
-    if test_df is not None:
-        print("Test labels:", test_df['label'].unique())
+    if test  is not None:
+        print("Test labels:", test['label'].unique())
 
     exit()
 
