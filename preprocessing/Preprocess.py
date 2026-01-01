@@ -71,7 +71,7 @@ class PKLPreprocessor:
             print("Test labels:", test_df['Label'].unique())
 
         print(dataset)
-        exit()
+        #exit()
 
         train = self._df_to_instances(train_df)
         dev = self._df_to_instances(dev_df) if dev_df is not None else []
