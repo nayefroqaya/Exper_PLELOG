@@ -20,8 +20,20 @@ class PKLPreprocessor:
         train_df = pd.read_pickle(train_pkl)
         dev_df = pd.read_pickle(dev_pkl) if dev_pkl else None
         test_df = pd.read_pickle(test_pkl) if test_pkl else None
+        print(dataset)
+        train_df.info()
+        dev_df.info()
+        test_df.info()
 
+        print("Train labels:", train_df['label'].unique())
 
+        if dev is not None:
+            print("Dev labels:", dev_df['label'].unique())
+
+        if test is not None:
+            print("Test labels:", test_df['label'].unique())
+
+        exit()
 
         train = self._df_to_instances(train_df)
         dev = self._df_to_instances(dev_df) if dev_df is not None else []

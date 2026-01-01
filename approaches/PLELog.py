@@ -214,16 +214,6 @@ if __name__ == '__main__':
     train, dev, test = processor.load_pkl(train_pkl, dev_pkl, test_pkl)
 
     print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
-    print(dataset)
-    print("Train labels:", train['label'].unique())
-
-    if dev is not None:
-        print("Dev labels:", dev['label'].unique())
-
-    if test  is not None:
-        print("Test labels:", test['label'].unique())
-
-    exit()
 
     # ---------------- Embeddings ----------------
     all_event_ids = set()
