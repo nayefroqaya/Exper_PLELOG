@@ -236,7 +236,7 @@ if __name__ == '__main__':
 
     # ---------------- Create directories ----------------
     os.makedirs(output_model_dir, exist_ok=True)
-    os.makedirs(os.path.dirname(prob_label_res_file), exist_ok=True)
+    os.makedirs(os.path.dirname(prob_label_res_dir), exist_ok=True)
     # ---------------- Load PKL ----------------
     train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
     dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
