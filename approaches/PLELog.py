@@ -16,7 +16,6 @@ from representations.templates.statistics import Simple_template_TF_IDF, Templat
 from representations.sequences.statistics import Sequential_TF
 from preprocessing.datacutter.SimpleCutting import cut_by_613
 from preprocessing.AutoLabeling import Probabilistic_Labeling
-from preprocessing.Preprocess import Preprocessor
 from preprocessing.Preprocess import PKLPreprocessor
 
 from module.Optimizer import Optimizer
