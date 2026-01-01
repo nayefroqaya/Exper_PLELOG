@@ -3,7 +3,6 @@ from entities.instances import Instance
 from models.clustering import Solitary_HDBSCAN
 from utils.common import get_precision_recall
 
-
 class Probabilistic_Labeling():
     def __init__(self, min_samples, min_clust_size, res_file=None, rand_state_file=None):
         self.model = Solitary_HDBSCAN(min_cluster_size=min_clust_size, min_samples=min_samples)
