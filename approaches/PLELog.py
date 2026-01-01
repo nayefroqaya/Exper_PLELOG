@@ -165,6 +165,22 @@ class PLELog:
 
         return precision, recall, f
 
+    def clear_folder(folder_path):
+        if not os.path.exists(folder_path):
+            print(f"Folder does not exist: {folder_path}")
+            return
+
+        for item in os.listdir(folder_path):
+            item_path = os.path.join(folder_path, item)
+
+            if os.path.isfile(item_path) or os.path.islink(item_path):
+                os.remove(item_path)
+
+            elif os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+
+        print(f"Cleared all contents of: {folder_path}")
+
 
 if __name__ == '__main__':
     print('start main function ......')
@@ -199,6 +215,7 @@ if __name__ == '__main__':
     # ---------------- Paths ----------------
     PROJECT_ROOT = '.'  # adjust as needed
     save_dir = os.path.join(PROJECT_ROOT, 'outputs')
+    clear_folder(save_dir)
     output_model_dir = os.path.join(save_dir, f'models/PLELog/{dataset}_{parser}/model')
     prob_label_res_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
     rand_state = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
