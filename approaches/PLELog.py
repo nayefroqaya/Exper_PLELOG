@@ -260,12 +260,16 @@ if __name__ == '__main__':
     encoder = Sequential_TF(processor.embedding)
     for inst, vec in zip(train, encoder.present(train)):
         inst.repr = vec
-    for inst, vec in zip(test, encoder.present(test)):
+
+    for inst, vec in zip(dev, encoder.present(dev)):
         inst.repr = vec
 
+    for inst, vec in zip(test, encoder.present(test)):
+        inst.repr = vec
     # ---------------- Dimension Reduction (FastICA) ----------------
     train_reprs = np.array([inst.repr for inst in train])
-    test_reprs  = np.array([inst.repr for inst in test])
+    dev_reprs = np.array([inst.repr for inst in dev])  # <-- Added
+    test_reprs = np.array([inst.repr for inst in test])
 
     transformer = None
     if reduce_dimension != -1:
@@ -284,9 +288,15 @@ if __name__ == '__main__':
         transformer = FastICA(n_components=reduce_dimension, random_state=0)
         train_reprs = transformer.fit_transform(train_reprs)
 
-        # Assign back
+        # Assign back to train
         for idx, inst in enumerate(train):
             inst.repr = train_reprs[idx]
+
+        # --- CHANGE / ADD: Transform dev using SAME scaler + ICA ---
+        dev_reprs = scaler.transform(dev_reprs)
+        dev_reprs = transformer.transform(dev_reprs)
+        for idx, inst in enumerate(dev):
+            inst.repr = dev_reprs[idx]  # <-- Added
 
         # Transform test set
         test_reprs = scaler.transform(test_reprs)
@@ -323,13 +333,8 @@ if __name__ == '__main__':
             os.remove(rand_state)
             print(f"Removed old random state file: {rand_state}")
 
-
-    label_generator = Probabilistic_Labeling(
-        min_samples=min_samples,
-        min_clust_size=min_cluster_size,
-        res_file=prob_label_res_file,
-        rand_state_file=rand_state
-    )
+    label_generator = Probabilistic_Labeling(min_samples=min_samples, min_clust_size=min_cluster_size,
+        res_file=prob_label_res_file, rand_state_file=rand_state)
     labeled_train = label_generator.auto_label(train, normal_ids)
 
     # ---------------- Model ----------------
@@ -344,7 +349,7 @@ if __name__ == '__main__':
     last_model_file = os.path.join(output_model_dir, 'last.pt')
 
     # ========================= TRAIN =========================
-    Estimated_training_time=0.0
+    Estimated_training_time = 0.0
     if mode == 'train':
         optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
         bestF = 0.0
@@ -366,7 +371,7 @@ if __name__ == '__main__':
             # ---- DEV evaluation ----
             if dev:
                 p_dev, r_dev, f_dev = plelog.evaluate(dev, threshold)
-                print(f"[DEV] Epoch {epoch+1} | F1={f_dev:.4f}")
+                print(f"[DEV] Epoch {epoch + 1} | F1={f_dev:.4f}")
 
                 if f_dev > bestF:
                     bestF = f_dev
@@ -374,7 +379,7 @@ if __name__ == '__main__':
 
         torch.save(plelog.model.state_dict(), last_model_file)
         train_time = (time.time() - start_train) / 60
-        Estimated_training_time=train_time
+        Estimated_training_time = train_time
         print(f"\nTotal training time: {Estimated_training_time:.2f} minutes")
 
     # ========================= TEST =========================
