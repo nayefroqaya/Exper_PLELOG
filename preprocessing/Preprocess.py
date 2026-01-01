@@ -24,7 +24,7 @@ class PKLPreprocessor:
         dev_df.info()
         test_df.info()
 
-        '''
+
         train_df = train_df.drop(columns=['Label'])
         test_df = test_df.drop(columns=['Label'])
         dev_df = dev_df.drop(columns=['Label'])
@@ -51,10 +51,10 @@ class PKLPreprocessor:
 
             return df
 
-        train_df = fix_labels(train_df)
-        dev_df = fix_labels(dev_df)
-        test_df = fix_labels(test_df)
-        '''
+        #train_df = fix_labels(train_df)
+        #dev_df = fix_labels(dev_df)
+        #test_df = fix_labels(test_df)
+
 
         train_df.info()
         test_df.info()
