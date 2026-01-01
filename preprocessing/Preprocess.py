@@ -24,6 +24,7 @@ class PKLPreprocessor:
         dev_df.info()
         test_df.info()
 
+        '''
         train_df = train_df.drop(columns=['Label'])
         test_df = test_df.drop(columns=['Label'])
         dev_df = dev_df.drop(columns=['Label'])
@@ -35,6 +36,7 @@ class PKLPreprocessor:
         train_df.info()
         test_df.info()
         dev_df.info()
+        '''
         print(train_df['Label'].unique())
         print(test_df['Label'].unique())
         print(dev_df['Label'].unique())
