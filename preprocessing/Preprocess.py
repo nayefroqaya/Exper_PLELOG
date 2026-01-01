@@ -33,22 +33,42 @@ class PKLPreprocessor:
         test_df = test_df.rename(columns={'Original_Label': 'Label'})
         dev_df = dev_df.rename(columns={'Original_Label': 'Label'})
 
+        def fix_labels(df):
+            for i in range(len(df)):
+                current_label = df.at[i, 'Label']
+
+                if current_label == 'Normal':
+                    df.at[i, 'Label'] = 'Normal'
+
+                elif current_label == 'Anomaly':
+                    df.at[i, 'Label'] = 'Anomaly'
+
+                else:
+                    if current_label == '-':
+                        df.at[i, 'Label'] = 'Normal'
+                    else:
+                        df.at[i, 'Label'] = 'Anomaly'
+
+            return df
+
+        train_df = fix_labels(train_df)
+        dev_df = fix_labels(dev_df)
+        test_df = fix_labels(test_df)
+        '''
+
         train_df.info()
         test_df.info()
         dev_df.info()
-        '''
+
         print(train_df['Label'].unique())
         print(test_df['Label'].unique())
         print(dev_df['Label'].unique())
 
         print("Train labels:", train_df['Label'].unique())
-
         if dev_df is not None:
             print("Dev labels:", dev_df['Label'].unique())
-
         if test_df is not None:
             print("Test labels:", test_df['Label'].unique())
-
 
         print(dataset)
         exit()
