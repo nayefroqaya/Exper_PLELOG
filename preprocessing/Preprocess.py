@@ -41,10 +41,10 @@ class PKLPreprocessor:
 
         print("Train labels:", train_df['Label'].unique())
 
-        if dev is not None:
+        if dev_df is not None:
             print("Dev labels:", dev_df['Label'].unique())
 
-        if test is not None:
+        if test_df is not None:
             print("Test labels:", test_df['Label'].unique())
 
         exit()
