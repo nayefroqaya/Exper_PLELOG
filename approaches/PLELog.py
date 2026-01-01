@@ -214,12 +214,25 @@ if __name__ == '__main__':
 
     # ---------------- Paths ----------------
     PROJECT_ROOT = '.'  # adjust as needed
+    #save_dir = os.path.join(PROJECT_ROOT, 'outputs')
+    #output_model_dir = os.path.join(save_dir, f'models/PLELog/{dataset}_{parser}/model')
+    #prob_label_res_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
+    #rand_state = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
+    #os.makedirs(output_model_dir, exist_ok=True)
+    # ---------------- Paths ----------------
     save_dir = os.path.join(PROJECT_ROOT, 'outputs')
-    output_model_dir = os.path.join(save_dir, f'models/PLELog/{dataset}_{parser}/model')
-    prob_label_res_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
-    rand_state = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
-    os.makedirs(output_model_dir, exist_ok=True)
 
+    # Base experiment directory
+    exp_dir = os.path.join(save_dir, 'results', 'PLELog', f'{dataset}_{parser}')
+
+    # Sub-directories
+    output_model_dir = os.path.join(exp_dir, 'model')
+    prob_label_res_file = os.path.join(exp_dir, 'prob_label_res', f'mcs-{min_cluster_size}_ms-{min_samples}')
+    rand_state = os.path.join(exp_dir, 'prob_label_res', 'random_state')
+
+    # ---------------- Create directories ----------------
+    os.makedirs(output_model_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(prob_label_res_file), exist_ok=True)
     # ---------------- Load PKL ----------------
     train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
     dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
