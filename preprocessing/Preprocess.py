@@ -20,7 +20,6 @@ class PKLPreprocessor:
         train_df = pd.read_pickle(train_pkl)
         dev_df = pd.read_pickle(dev_pkl) if dev_pkl else None
         test_df = pd.read_pickle(test_pkl) if test_pkl else None
-        print(dataset)
         train_df.info()
         dev_df.info()
         test_df.info()
