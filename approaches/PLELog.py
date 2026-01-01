@@ -325,16 +325,16 @@ if __name__ == '__main__':
             print(f"Removed old probabilistic labels file: {prob_label_res_file}")
 
     # Remove random state file if it exists
-    if os.path.exists(rand_state):
-        if os.path.isdir(rand_state):
-            shutil.rmtree(rand_state)
-            print(f"Removed old random state folder: {rand_state}")
+    if os.path.exists(rand_state_file):
+        if os.path.isdir(rand_state_file):
+            shutil.rmtree(rand_state_file)
+            print(f"Removed old random state folder: {rand_state_file}")
         else:
-            os.remove(rand_state)
-            print(f"Removed old random state file: {rand_state}")
+            os.remove(rand_state_file)
+            print(f"Removed old random state file: {rand_state_file}")
 
     label_generator = Probabilistic_Labeling(min_samples=min_samples, min_clust_size=min_cluster_size,
-        res_file=prob_label_res_file, rand_state_file=rand_state)
+        res_file=prob_label_res_file, rand_state_file=rand_state_file)
     labeled_train = label_generator.auto_label(train, normal_ids)
 
     # ---------------- Model ----------------
