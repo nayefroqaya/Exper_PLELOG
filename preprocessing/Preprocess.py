@@ -34,20 +34,20 @@ class PKLPreprocessor:
         dev_df = dev_df.rename(columns={'Original_Label': 'Label'})
 
         def fix_labels(df):
-            for i in range(len(df)):
-                current_label = df.at[i, 'Label']
+            for idx, row in df.iterrows():
+                current_label = row['Label']
 
                 if current_label == 'Normal':
-                    df.at[i, 'Label'] = 'Normal'
+                    df.at[idx, 'Label'] = 'Normal'
 
                 elif current_label == 'Anomaly':
-                    df.at[i, 'Label'] = 'Anomaly'
+                    df.at[idx, 'Label'] = 'Anomaly'
 
                 else:
                     if current_label == '-':
-                        df.at[i, 'Label'] = 'Normal'
+                        df.at[idx, 'Label'] = 'Normal'
                     else:
-                        df.at[i, 'Label'] = 'Anomaly'
+                        df.at[idx, 'Label'] = 'Anomaly'
 
             return df
 
