@@ -32,8 +32,9 @@ torch.backends.cudnn.deterministic = True
 #device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 #print(f"Using device: {device}")
 #exit()
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-device = torch.device("cuda:0")
+#device = torch.device("cuda:0")
 #print(f"Using device: {device}")
 #exit()
 SESSION = hashlib.md5(

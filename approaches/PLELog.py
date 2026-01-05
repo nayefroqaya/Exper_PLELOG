@@ -76,7 +76,12 @@ class PLELog:
 
         # ---------------- Model ----------------
         self.model = AttGRUModel(vocab, self.num_layer, self.hidden_size)
-        self.model = self.model.to(device)
+        #self.model = self.model.to(device) # for CPU
+        if torch.cuda.is_available():
+            self.model = self.model.cuda(device)
+        else: # new
+            self.model = self.model.to(device)
+
 
         # ---------------- Loss ----------------
         # NOTE: model outputs probabilities after softmax
@@ -137,7 +142,9 @@ class PLELog:
 
             for onebatch in data_iter(instances, self.test_batch_size, False):
                 tinst = generate_tinsts_binary_label(onebatch, self.vocab, False)
-                tinst.to_device(device)
+                #tinst.to_device(device)  # only CPU
+                tinst.to_cuda(device)
+
 
                 pred_tags, tag_logits = self.predict(tinst.inputs, threshold)
 
@@ -365,7 +372,9 @@ if __name__ == '__main__':
             plelog.model.train()
             for onebatch in data_iter(labeled_train, batch_size, True):
                 tinst = generate_tinsts_binary_label(onebatch, vocab)
-                tinst.to_device(device)
+                #tinst.to_device(device)  # only CPU
+                tinst.to_cuda(device)
+
 
                 loss = plelog.forward(tinst.inputs, tinst.targets)
                 loss.backward()
