@@ -1,7 +1,7 @@
 import sys
 print("Imported _1 ")
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""   # ⛔ Disable GPU completely
+#os.environ["CUDA_VISIBLE_DEVICES"] = ""   # ⛔ Disable GPU completely
 import colorama
 colorama.init()
 sys.path.extend([".", ".."])
@@ -188,14 +188,18 @@ if __name__ == '__main__':
     RESET = colorama.Fore.RESET
 
     # ---------------- Device setup (CPU ONLY) ----------------
-    device = torch.device("cpu")
-    torch.backends.cudnn.enabled = False
-    torch.backends.cuda.enabled = False
-    print(f"Using device: CPU only{RESET}")
+    #device = torch.device("cpu")
+    #torch.backends.cudnn.enabled = False
+    #torch.backends.cuda.enabled = False
+    #print(f"Using device: CPU only{RESET}")
+    # Automatically select GPU if available, otherwise CPU
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Enable cuDNN for GPU acceleration
+    torch.backends.cudnn.enabled = True
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='HDFS', type=str)
+    argparser.add_argument('--dataset', default='BGL', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
