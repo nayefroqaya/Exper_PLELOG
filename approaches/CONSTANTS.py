@@ -33,7 +33,7 @@ torch.backends.cudnn.deterministic = True
 #print(f"Using device: {device}")
 #exit()
 
-device = torch.device("GPU")
+device = torch.device("cuda")
 #print(f"Using device: {device}")
 #exit()
 SESSION = hashlib.md5(
