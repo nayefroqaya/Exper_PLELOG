@@ -59,8 +59,8 @@ class AttGRUModel(nn.Module):
         embed = self.word_embed(words)
         if self.training:
             embed = drop_input_independent(embed, self.dropout)
-#        embed = embed.cuda(device)
-        embed = embed.to(device)
+        embed = embed.cuda(device)
+        #embed = embed.to(device)
         batch_size = embed.size(0)
         atten_guide = torch.unsqueeze(self.atten_guide, dim=1).expand(-1, batch_size)
         atten_guide = atten_guide.transpose(1, 0)
