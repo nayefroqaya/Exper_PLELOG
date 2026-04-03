@@ -25,6 +25,18 @@ class PKLPreprocessor:
         test_df.info()
         print('-----check results ------')
 
+        print('-----Training------')
+        print(train_df["Original_Label"].unique())
+        print(train_df["Label"].unique())
+
+        print('-----dev ------')
+        print(dev_df["Original_Label"].unique())
+        print(dev_df["Label"].unique())
+
+        print('-----test ------')
+        print(test_df["Original_Label"].unique())
+        print(test_df["Label"].unique())
+
 
         exit()
 
