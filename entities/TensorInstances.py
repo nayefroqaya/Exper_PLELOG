@@ -10,20 +10,20 @@ class TInstWithLogits:
         self.g_truth = Variable(torch.LongTensor(batch_size).zero_(), requires_grad=False)
         self.word_len = Variable(torch.LongTensor(batch_size).zero_(), requires_grad=False)
 
-    def to_cuda(self, device):
-        self.src_words = self.src_words.cuda(device)
-        self.src_masks = self.src_masks.cuda(device)
-        self.tags = self.tags.cuda(device)
-        self.g_truth = self.g_truth.cuda(device)
-        self.word_len = self.word_len.cuda(device)
+    #def to_cuda(self, device):
+    #    self.src_words = self.src_words.cuda(device)
+    #    self.src_masks = self.src_masks.cuda(device)
+    #    self.tags = self.tags.cuda(device)
+    #    self.g_truth = self.g_truth.cuda(device)
+    #    self.word_len = self.word_len.cuda(device)
    
 
-#    def to_device(self, device):
-#        self.src_words = self.src_words.to(device)
-#        self.src_masks = self.src_masks.to(device)
-#        self.tags = self.tags.to(device)
-#        self.g_truth = self.g_truth.to(device)
-#        self.word_len = self.word_len.to(device)
+    def to_device(self, device):
+        self.src_words = self.src_words.to(device)
+        self.src_masks = self.src_masks.to(device)
+        self.tags = self.tags.to(device)
+        self.g_truth = self.g_truth.to(device)
+        self.word_len = self.word_len.to(device)
 
 
     @property
