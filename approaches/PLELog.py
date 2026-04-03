@@ -252,16 +252,16 @@ if __name__ == '__main__':
     os.makedirs(os.path.dirname(prob_label_res_dir), exist_ok=True)
     # ---------------- Load PKL ----------------
     # first paper :
-    train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
-    dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
-    test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
+    #train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
+    #dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
+    #test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
 
 
 
     # second
-    #train_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/train_df.pkl'
-    #test_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/test_df.pkl'
-    #dev_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/val_df.pkl'
+    train_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/train_df.pkl'
+    test_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/test_df.pkl'
+    dev_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/val_df.pkl'
 
     #PLELog.clear_folder(save_dir)
 
