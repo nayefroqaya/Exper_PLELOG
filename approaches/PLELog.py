@@ -1,7 +1,7 @@
 import sys
 print("Imported _1 ")
 import os
-#os.environ["CUDA_VISIBLE_DEVICES"] = ""   # ⛔ Disable GPU completely
+os.environ["CUDA_VISIBLE_DEVICES"] = ""   # ⛔ Disable GPU completely
 import colorama
 colorama.init()
 sys.path.extend([".", ".."])
@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='TH_1G', type=str)
+    argparser.add_argument('--dataset', default='HDFS', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -251,9 +251,18 @@ if __name__ == '__main__':
     os.makedirs(output_model_dir, exist_ok=True)
     os.makedirs(os.path.dirname(prob_label_res_dir), exist_ok=True)
     # ---------------- Load PKL ----------------
+    # first paper :
     train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
     dev_pkl   = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl'
     test_pkl  = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl'
+
+
+
+    # second
+    #train_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/train_df.pkl'
+    #test_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/test_df.pkl'
+    #dev_pkl = '../NovaAD_Plus/dataset/HDFS/1_HDFS_Splitted_Datasets/val_df.pkl'
+
     #PLELog.clear_folder(save_dir)
 
     processor = PKLPreprocessor()
