@@ -259,9 +259,9 @@ if __name__ == '__main__':
 
 
     # second
-    train_pkl = '../NovaAD_Plus/datasets/HDFS/1_HDFS_Splitted_Datasets/train_df.pkl'
-    test_pkl = '../NovaAD_Plus/datasets/HDFS/1_HDFS_Splitted_Datasets/test_df.pkl'
-    dev_pkl = '../NovaAD_Plus/datasets/HDFS/1_HDFS_Splitted_Datasets/val_df.pkl'
+    train_pkl = '../NovaAD_Plus/datasets/HDFS/1_HDFS_Splitted_Datasets/train_df/train_df.pkl'
+    test_pkl = '../NovaAD_Plus/datasets/HDFS/1_HDFS_Splitted_Datasets/test_df/test_df.pkl'
+    dev_pkl = '../NovaAD_Plus/datasets/HDFS/1_HDFS_Splitted_Datasets/val_df/val_df.pkl'
 
     #PLELog.clear_folder(save_dir)
 
