@@ -142,8 +142,8 @@ class PLELog:
 
             for onebatch in data_iter(instances, self.test_batch_size, False):
                 tinst = generate_tinsts_binary_label(onebatch, self.vocab, False)
-                #tinst.to_device(device)  # only CPU
-                tinst.to_cuda(device)
+                tinst.to_device(device)  # only CPU
+                #tinst.to_cuda(device)
 
 
                 pred_tags, tag_logits = self.predict(tinst.inputs, threshold)
@@ -381,8 +381,8 @@ if __name__ == '__main__':
             plelog.model.train()
             for onebatch in data_iter(labeled_train, batch_size, True):
                 tinst = generate_tinsts_binary_label(onebatch, vocab)
-                #tinst.to_device(device)  # only CPU
-                tinst.to_cuda(device)
+                tinst.to_device(device)  # only CPU
+                #tinst.to_cuda(device)
 
 
                 loss = plelog.forward(tinst.inputs, tinst.targets)
