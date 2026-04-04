@@ -24,18 +24,18 @@ class PKLPreprocessor:
         dev_df.info()
         test_df.info()
         if dataset=='TH_1G' :
-            train_df = train_df.withColumn("Label", when(col("Label") == "-", "Normal").when(col("Label").isin("Normal", "Anomaly"),
-                                                                                 col("Label")).otherwise("Anomaly"))
-            dev_df = dev_df.withColumn("Label",
-                                       when(col("Label") == "-", "Normal").when(col("Label").isin("Normal", "Anomaly"),
-                                                                                col("Label")).otherwise("Anomaly"))
-            test_df = test_df.withColumn("Label",
-                                   when(col("Label") == "-", "Normal").when(col("Label").isin("Normal", "Anomaly"),
-                                                                            col("Label")).otherwise("Anomaly"))
+
+            train_df["Label"] = train_df["Label"].apply(
+                lambda x: "Normal" if x == "-" else x if x in ["Normal", "Anomaly"] else "Anomaly")
+
+            dev_df["Label"] = dev_df["Label"].apply(
+                lambda x: "Normal" if x == "-" else x if x in ["Normal", "Anomaly"] else "Anomaly")
+
+            test_df["Label"] = test_df["Label"].apply(
+                lambda x: "Normal" if x == "-" else x if x in ["Normal", "Anomaly"] else "Anomaly")
 
 
             print('-----check results -----------------------------------------------------')
-
             print('-----Training------')
             print(train_df["Original_Label"].unique())
             print(train_df["Label"].unique())
