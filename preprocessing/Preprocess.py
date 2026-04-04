@@ -34,19 +34,35 @@ class PKLPreprocessor:
                                                                             col("Label")).otherwise("Anomaly"))
 
 
-        print('-----check results -----------------------------------------------------')
+            print('-----check results -----------------------------------------------------')
 
-        print('-----Training------')
-        print(train_df["Original_Label"].unique())
-        print(train_df["Label"].unique())
+            print('-----Training------')
+            print(train_df["Original_Label"].unique())
+            print(train_df["Label"].unique())
 
-        print('-----dev ------')
-        print(dev_df["Original_Label"].unique())
-        print(dev_df["Label"].unique())
+            print('-----dev ------')
+            print(dev_df["Original_Label"].unique())
+            print(dev_df["Label"].unique())
 
-        print('-----test ------')
-        print(test_df["Original_Label"].unique())
-        print(test_df["Label"].unique())
+            print('-----test ------')
+            print(test_df["Original_Label"].unique())
+            print(test_df["Label"].unique())
+        else:
+
+            print('-----check results -----------------------------------------------------')
+
+            print('-----Training------')
+            print(train_df["Original_Label"].unique())
+            print(train_df["Label"].unique())
+
+            print('-----dev ------')
+            print(dev_df["Original_Label"].unique())
+            print(dev_df["Label"].unique())
+
+            print('-----test ------')
+            print(test_df["Original_Label"].unique())
+            print(test_df["Label"].unique())
+
 
 
         #exit()
