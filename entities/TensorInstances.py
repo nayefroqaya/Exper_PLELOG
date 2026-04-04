@@ -1,3 +1,5 @@
+from typing import Any
+
 import torch
 from torch.autograd import Variable
 
@@ -18,7 +20,7 @@ class TInstWithLogits:
     #    self.word_len = self.word_len.cuda(device)
    
 
-    def to_device(self, device):
+    def to_device(self, device: object) -> Any:
         self.src_words = self.src_words.to(device)
         self.src_masks = self.src_masks.to(device)
         self.tags = self.tags.to(device)
