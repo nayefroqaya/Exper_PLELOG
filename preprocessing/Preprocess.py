@@ -23,7 +23,18 @@ class PKLPreprocessor:
         train_df.info()
         dev_df.info()
         test_df.info()
-        print('-----check results ------')
+        if dataset=='TH_1G' :
+            train_df = train_df.withColumn("Label", when(col("Label") == "-", "Normal").when(col("Label").isin("Normal", "Anomaly"),
+                                                                                 col("Label")).otherwise("Anomaly"))
+            dev_df = dev_df.withColumn("Label",
+                                       when(col("Label") == "-", "Normal").when(col("Label").isin("Normal", "Anomaly"),
+                                                                                col("Label")).otherwise("Anomaly"))
+            test_df = test_df.withColumn("Label",
+                                   when(col("Label") == "-", "Normal").when(col("Label").isin("Normal", "Anomaly"),
+                                                                            col("Label")).otherwise("Anomaly"))
+
+
+        print('-----check results -----------------------------------------------------')
 
         print('-----Training------')
         print(train_df["Original_Label"].unique())
