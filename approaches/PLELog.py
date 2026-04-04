@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='HDFS', type=str)
+    argparser.add_argument('--dataset', default='BGL', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -259,9 +259,9 @@ if __name__ == '__main__':
 
 
     # second
-    train_pkl = '../../NovaAD_Plus/datasets/HDFS/3_HDFS_Splitted_Datasets/train_df.pkl'
-    test_pkl = '../../NovaAD_Plus/datasets/HDFS/3_HDFS_Splitted_Datasets/test_df.pkl'
-    dev_pkl = '../../NovaAD_Plus/datasets/HDFS/3_HDFS_Splitted_Datasets/val_df.pkl'
+    train_pkl = '../../NovaAD_Plus/datasets/BGL/1_BGL_Splitted_Datasets/train_df.pkl'
+    test_pkl = '../../NovaAD_Plus/datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl'
+    dev_pkl = '../../NovaAD_Plus/datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl'
 
     #PLELog.clear_folder(save_dir)
 
