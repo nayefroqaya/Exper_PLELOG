@@ -295,8 +295,8 @@ if __name__ == '__main__':
     # 2. Settings to change
     # ============================================================
 
-    CASE = "in_domain"
-    # CASE = "cross_dataset"
+    #CASE = "in_domain"
+    CASE = "cross_dataset"
 
     # For in-domain, this uses the same dataset variable from args.dataset
     TARGET_DATASET = dataset
