@@ -266,12 +266,6 @@ if __name__ == '__main__':
 
     #============================================++++++++++++++++++++++++++++++++++++++++++
 
-
-
-    import random
-
-    from preprocessing.preprocess_pkl import PKLPreprocessor
-
     # Change this import path if your PKLPreprocessor file has a different name
 
     # ============================================================
@@ -330,6 +324,7 @@ if __name__ == '__main__':
     random.seed(RANDOM_SEED)
 
     processor = PKLPreprocessor()
+
 
     # ============================================================
     # 4. Run selected case
