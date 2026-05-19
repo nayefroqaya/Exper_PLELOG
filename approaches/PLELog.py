@@ -1,7 +1,7 @@
 import sys
 print("Imported _1 ")
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = ""   # ⛔ Disable GPU completely
+#os.environ["CUDA_VISIBLE_DEVICES"] = ""   # ⛔ Disable GPU completely
 import colorama
 colorama.init()
 sys.path.extend([".", ".."])
