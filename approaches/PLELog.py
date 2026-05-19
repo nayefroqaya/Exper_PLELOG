@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    #argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str)
+    argparser.add_argument('--dataset', default='BGL', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -266,6 +266,8 @@ if __name__ == '__main__':
 
     #============================================++++++++++++++++++++++++++++++++++++++++++
 
+
+
     import random
 
     from preprocessing.preprocess_pkl import PKLPreprocessor
@@ -299,14 +301,27 @@ if __name__ == '__main__':
     # 2. Settings to change
     # ============================================================
 
+    CASE = "in_domain"
+    # CASE = "cross_dataset"
+
+    # For in-domain, this uses the same dataset variable from args.dataset
+    TARGET_DATASET = dataset
+
+    # For cross-dataset only
+    SOURCE_DATASETS = ["HDFS", "TH_1G"]
+    TARGET_NORMAL_FRACTION = 0.20
+    RANDOM_SEED = 42
+
+
+
     #CASE = "cross_dataset"
     #SOURCE_DATASETS = ["HDFS", "TH_1G"]
     #TARGET_NORMAL_FRACTION = 0.20
 
-    CASE = "in_domain"
-    TARGET_DATASET = "BGL"
+    #CASE = "in_domain"
+    #TARGET_DATASET = "BGL"
 
-    RANDOM_SEED = 42
+    #RANDOM_SEED = 42
 
     # ============================================================
     # 3. Create processor
