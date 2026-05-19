@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str)
+    #argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -259,14 +259,176 @@ if __name__ == '__main__':
 
 
     # second paper
-    train_pkl = '../../NovaAD_Plus/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_train_df.pkl'
-    test_pkl = '../../NovaAD_Plus/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_test_df.pkl'
-    dev_pkl = '../../NovaAD_Plus/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_val_df.pkl'
+    #train_pkl = '../../NovaAD_Plus/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_train_df.pkl'
+    #test_pkl = '../../NovaAD_Plus/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_test_df.pkl'
+    #dev_pkl = '../../NovaAD_Plus/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_val_df.pkl'
 
-    #PLELog.clear_folder(save_dir)
+
+    #============================================++++++++++++++++++++++++++++++++++++++++++
+
+    import random
+
+    from preprocessing.preprocess_pkl import PKLPreprocessor
+
+    # Change this import path if your PKLPreprocessor file has a different name
+
+    # ============================================================
+    # 1. Dataset paths
+    # ============================================================
+
+    DATASETS = {
+        "BGL": {"train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/train_df.pkl",
+            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl",
+            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl", },
+
+        "HDFS": {"train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/HDFS/1_HDFS_Splitted_Datasets/train_df.pkl",
+            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/HDFS/1_HDFS_Splitted_Datasets/val_df.pkl",
+            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/HDFS/1_HDFS_Splitted_Datasets/test_df.pkl", },
+
+        "TH_1G": {
+            "train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/train_df.pkl",
+            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/val_df.pkl",
+            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/test_df.pkl", },
+
+        "SP_150MB_ratio": {
+            "train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/train_df.pkl",
+            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/val_df.pkl",
+            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/test_df.pkl", }, }
+
+    # ============================================================
+    # 2. Settings to change
+    # ============================================================
+
+    #CASE = "cross_dataset"
+    #SOURCE_DATASETS = ["HDFS", "TH_1G"]
+    #TARGET_NORMAL_FRACTION = 0.20
+
+    CASE = "in_domain"
+    TARGET_DATASET = "BGL"
+
+    RANDOM_SEED = 42
+
+    # ============================================================
+    # 3. Create processor
+    # ============================================================
+
+    random.seed(RANDOM_SEED)
 
     processor = PKLPreprocessor()
-    train, dev, test = processor.load_pkl(dataset, train_pkl, dev_pkl, test_pkl)
+
+    # ============================================================
+    # 4. Run selected case
+    # ============================================================
+
+    if CASE == "in_domain":
+
+        paths = DATASETS[TARGET_DATASET]
+
+        train, dev, test = processor.load_pkl(TARGET_DATASET, paths["train_pkl"], paths["dev_pkl"], paths["test_pkl"])
+
+        print("\n==============================")
+        print("In-domain experiment")
+        print("==============================")
+        print("Dataset:", TARGET_DATASET)
+        print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
+
+
+    elif CASE == "cross_dataset":
+
+        all_source_train = []
+        all_source_dev = []
+
+        print("\n==============================")
+        print("Cross-dataset experiment")
+        print("==============================")
+        print("Sources:", SOURCE_DATASETS)
+        print("Target:", TARGET_DATASET)
+        print("Target normal fraction:", TARGET_NORMAL_FRACTION)
+
+        # ------------------------------------------------------------
+        # Load source datasets
+        # ------------------------------------------------------------
+
+        for source_dataset in SOURCE_DATASETS:
+            source_paths = DATASETS[source_dataset]
+
+            source_train, source_dev, source_test = processor.load_pkl(source_dataset, source_paths["train_pkl"],
+                source_paths["dev_pkl"], source_paths["test_pkl"])
+
+            all_source_train.extend(source_train)
+            all_source_dev.extend(source_dev)
+
+            print("\nLoaded source dataset:", source_dataset)
+            print("Source train:", len(source_train))
+            print("Source dev:", len(source_dev))
+            print("Source test not used:", len(source_test))
+
+        # ------------------------------------------------------------
+        # Load target dataset
+        # ------------------------------------------------------------
+
+        target_paths = DATASETS[TARGET_DATASET]
+
+        target_train, target_dev, target_test = processor.load_pkl(TARGET_DATASET, target_paths["train_pkl"],
+            target_paths["dev_pkl"], target_paths["test_pkl"])
+
+        # ------------------------------------------------------------
+        # Take only Normal from target train
+        # ------------------------------------------------------------
+
+        target_normal_train = []
+
+        for inst in target_train:
+            if inst.label == "Normal":
+                target_normal_train.append(inst)
+
+        number_to_take = int(len(target_normal_train) * TARGET_NORMAL_FRACTION)
+
+        target_normal_sample = random.sample(target_normal_train, number_to_take)
+
+        # ------------------------------------------------------------
+        # Final data
+        # ------------------------------------------------------------
+
+        train = all_source_train + target_normal_sample
+
+        dev = all_source_dev
+
+        # Important:
+        # target test is untouched
+        test = target_test
+
+        print("\n==============================")
+        print("Final cross-dataset data")
+        print("==============================")
+        print("Source train:", len(all_source_train))
+        print("Source dev:", len(all_source_dev))
+        print("Target train:", len(target_train))
+        print("Target normal train:", len(target_normal_train))
+        print("Target normal used:", len(target_normal_sample))
+        print("Final train:", len(train))
+        print("Final dev:", len(dev))
+        print("Target test untouched:", len(test))
+
+
+    else:
+        raise ValueError("CASE must be either 'in_domain' or 'cross_dataset'")
+
+    # ============================================================
+    # 5. Final print
+    # ============================================================
+
+    print("\n==============================")
+    print("Ready for training")
+    print("==============================")
+    print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
+    #======================================================++++++++++++++++++++++++++++++++++++++++
+
+
+    # use in firt and second paper
+    #processor = PKLPreprocessor()
+    #train, dev, test = processor.load_pkl(dataset, train_pkl, dev_pkl, test_pkl)
+
 
     print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
 
