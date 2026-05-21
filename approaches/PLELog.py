@@ -271,7 +271,7 @@ if __name__ == '__main__':
     # ============================================================
     # 1. Dataset paths
     # ============================================================
-
+    # Important : ----- we copied the datset folder from LWADLS to Exper_LogForm
     DATASETS = {
         "BGL": {"train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/train_df.pkl",
             "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl",
@@ -287,35 +287,24 @@ if __name__ == '__main__':
             "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/test_df.pkl", },
 
         "SP_150MB_ratio": {
-            "train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/train_df.pkl",
-            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/val_df.pkl",
-            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/test_df.pkl", }, }
+            "train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/SP_150MB_ratio/1_SP_150MB_ratio_Splitted_Datasets/train_df.pkl",
+            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/SP_150MB_ratio/1_SP_150MB_ratio_Splitted_Datasets/val_df.pkl",
+            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/SP_150MB_ratio/1_SP_150MB_ratio_Splitted_Datasets/test_df.pkl", }, }
 
     # ============================================================
     # 2. Settings to change
     # ============================================================
 
-    #CASE = "in_domain"
-    CASE = "cross_dataset"
+    CASE = "in_domain"
+    #CASE = "cross_dataset"
 
     # For in-domain, this uses the same dataset variable from args.dataset
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["HDFS", "TH_1G"]
+    SOURCE_DATASETS = ["BGL"]
     TARGET_NORMAL_FRACTION = 0.20
     RANDOM_SEED = 42
-
-
-
-    #CASE = "cross_dataset"
-    #SOURCE_DATASETS = ["HDFS", "TH_1G"]
-    #TARGET_NORMAL_FRACTION = 0.20
-
-    #CASE = "in_domain"
-    #TARGET_DATASET = "BGL"
-
-    #RANDOM_SEED = 42
 
     # ============================================================
     # 3. Create processor
