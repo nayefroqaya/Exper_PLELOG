@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str)
+    argparser.add_argument('--dataset', default='HDFS', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -295,14 +295,14 @@ if __name__ == '__main__':
     # 2. Settings to change
     # ============================================================
 
-    CASE = "in_domain"
-    #CASE = "cross_dataset"
+    #CASE = "in_domain"
+    CASE = "cross_dataset"
 
     # For in-domain, this uses the same dataset variable from args.dataset
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["SP_150MB_ratio"]
+    SOURCE_DATASETS = ["BGL"]
     TARGET_NORMAL_FRACTION = 0.20
     RANDOM_SEED = 42
 
