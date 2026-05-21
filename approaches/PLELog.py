@@ -208,7 +208,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='HDFS', type=str)
+    argparser.add_argument('--dataset', default='TH_1G', type=str)
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -302,7 +302,7 @@ if __name__ == '__main__':
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["HDFS"]
+    SOURCE_DATASETS = ["TH_1G"]
     TARGET_NORMAL_FRACTION = 0.20
     RANDOM_SEED = 42
 
