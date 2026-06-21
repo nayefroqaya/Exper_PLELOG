@@ -520,6 +520,12 @@ if __name__ == '__main__':
     argparser.add_argument('--reduce_dimension', type=int, default=100)
     argparser.add_argument('--threshold', type=float, default=0.5)
     argparser.add_argument('--case', default='in_domain', type=str, choices=['in_domain', 'cross_dataset'])
+    argparser.add_argument(
+        '--data_root',
+        default='../../LWADLS/datasets',
+        type=str,
+        help='Root folder for reading PKL files, e.g., ../../LWADLS/datasets'
+    )
     args, _ = argparser.parse_known_args()
 
     dataset = args.dataset
@@ -530,6 +536,7 @@ if __name__ == '__main__':
     reduce_dimension = args.reduce_dimension
     threshold = args.threshold
     case = args.case
+    data_root = args.data_root
 
     # ---------------- Paths ----------------
     def find_project_root():
@@ -622,44 +629,121 @@ if __name__ == '__main__':
     # ============================================================
     # 1. Dataset paths
     # ============================================================
-    def make_dataset_paths(dataset_name):
+    def resolve_data_root(raw_data_root):
         """
-        Build paths for your current folder structure:
-            ~/PLELog/datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl
-            ~/PLELog/datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl
-            ~/PLELog/datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl
+        Resolve the input PKL data root.
+
+        Default reading style requested by the user:
+            ../../LWADLS/datasets
+
+        Example generated path:
+            ../../LWADLS/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_train_df.pkl
+
+        The function keeps the requested relative style, but also checks common
+        absolute locations so the script can be run from the PLELog root.
         """
-        split_dir = os.path.join(
-            DATASETS_ROOT,
-            dataset_name,
-            f"1_{dataset_name}_Splitted_Datasets"
-        )
+        candidates = []
+
+        # 1) exactly as provided, relative to current working directory
+        candidates.append(os.path.abspath(raw_data_root))
+
+        # 2) relative to this script location
+        script_dir = os.path.abspath(os.path.dirname(__file__))
+        candidates.append(os.path.abspath(os.path.join(script_dir, raw_data_root)))
+
+        # 3) common case: LWADLS is next to PLELog
+        candidates.append(os.path.abspath(os.path.join(PROJECT_ROOT, "..", "LWADLS", "datasets")))
+
+        # 4) common case if PLELog is inside another folder and ../../LWADLS is correct
+        candidates.append(os.path.abspath(os.path.join(PROJECT_ROOT, "..", "..", "LWADLS", "datasets")))
+
+        # 5) local fallback, useful if files are copied into PLELog/datasets
+        candidates.append(DATASETS_ROOT)
+
+        seen = set()
+        unique_candidates = []
+        for cand in candidates:
+            if cand not in seen:
+                unique_candidates.append(cand)
+                seen.add(cand)
+
+        for cand in unique_candidates:
+            if os.path.isdir(cand):
+                return cand, unique_candidates
+
+        # Return first candidate even if missing, so error message is clear.
+        return unique_candidates[0], unique_candidates
+
+
+    READ_DATASETS_ROOT, data_root_candidates = resolve_data_root(data_root)
+
+    print("\n==============================")
+    print("Dataset input root candidates")
+    print("==============================")
+    print("Requested data_root:", data_root)
+    for cand in data_root_candidates:
+        print(f"candidate: {cand} | exists={os.path.isdir(cand)}")
+    print("Selected read root:", READ_DATASETS_ROOT)
+    print("==============================\n")
+
+
+    def make_dataset_paths(dataset_name, base_dir=None):
+        """
+        Build dataset paths using the LWADLS folder structure.
+
+        Required format:
+            ../../LWADLS/datasets/{DATASET}/3_{DATASET}_Splitted_Datasets/3_{DATASET}_train_df.pkl
+            ../../LWADLS/datasets/{DATASET}/3_{DATASET}_Splitted_Datasets/3_{DATASET}_val_df.pkl
+            ../../LWADLS/datasets/{DATASET}/3_{DATASET}_Splitted_Datasets/3_{DATASET}_test_df.pkl
+
+        Example:
+            ../../LWADLS/datasets/SP_150MB_ratio/3_SP_150MB_ratio_Splitted_Datasets/3_SP_150MB_ratio_train_df.pkl
+        """
+        if base_dir is None:
+            base_dir = READ_DATASETS_ROOT
+
+        split_folder = f"3_{dataset_name}_Splitted_Datasets"
 
         return {
-            "train_pkl": os.path.join(split_dir, "train_df.pkl"),
-            "dev_pkl": os.path.join(split_dir, "val_df.pkl"),
-            "test_pkl": os.path.join(split_dir, "test_df.pkl"),
+            "train_pkl": os.path.join(
+                base_dir,
+                dataset_name,
+                split_folder,
+                f"3_{dataset_name}_train_df.pkl"
+            ),
+            "dev_pkl": os.path.join(
+                base_dir,
+                dataset_name,
+                split_folder,
+                f"3_{dataset_name}_val_df.pkl"
+            ),
+            "test_pkl": os.path.join(
+                base_dir,
+                dataset_name,
+                split_folder,
+                f"3_{dataset_name}_test_df.pkl"
+            ),
         }
 
-    available_dataset_dirs = [
-        name for name in os.listdir(DATASETS_ROOT)
-        if os.path.isdir(os.path.join(DATASETS_ROOT, name))
+
+    # Datasets supported by the experiment. Output is saved in local PLELog/datasets/{dataset},
+    # but input PKL files are read from READ_DATASETS_ROOT using the 3_* LWADLS structure.
+    SUPPORTED_DATASETS = [
+        "BGL",
+        "HDFS",
+        "TH_1G",
+        "SP_150MB",
+        "SP_150MB_ratio",
     ]
 
     DATASETS = {
         name: make_dataset_paths(name)
-        for name in available_dataset_dirs
-        if os.path.isdir(
-            os.path.join(DATASETS_ROOT, name, f"1_{name}_Splitted_Datasets")
-        )
+        for name in SUPPORTED_DATASETS
     }
 
     if dataset not in DATASETS:
         raise ValueError(
-            f"Unknown dataset '{dataset}' or split folder not found.\n"
-            f"Expected split folder: "
-            f"{os.path.join(DATASETS_ROOT, dataset, f'1_{dataset}_Splitted_Datasets')}\n"
-            f"Available datasets with split folders: {list(DATASETS.keys())}"
+            f"Unknown dataset '{dataset}'. Supported datasets: {SUPPORTED_DATASETS}"
         )
 
     print("\n==============================")
@@ -675,7 +759,10 @@ if __name__ == '__main__':
 
     if missing_paths:
         raise FileNotFoundError(
-            "Missing required PKL files:\n" + "\n".join(missing_paths)
+            "Missing required PKL files for dataset " + dataset + ":\n"
+            + "\n".join(os.path.abspath(p) for p in missing_paths)
+            + "\n\nUse --data_root to point to your LWADLS datasets folder. Example:\n"
+            + "python PLELog_full_updated.py --dataset SP_150MB_ratio --data_root ../../LWADLS/datasets"
         )
 
     # ============================================================
