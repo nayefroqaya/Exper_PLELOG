@@ -512,7 +512,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='BGL', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='SP_150MB', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -532,19 +532,58 @@ if __name__ == '__main__':
     case = args.case
 
     # ---------------- Paths ----------------
-    PROJECT_ROOT = '.'  # Run this script from the PLELog project root: ~/PLELog
+    def find_project_root():
+        """
+        Find the PLELog project root automatically.
+        This works from your actual structure:
+            ~/PLELog/LICENSE
+            ~/PLELog/datasets
+            ~/PLELog/models
+            ~/PLELog/preprocessing
+        """
+        candidates = []
+
+        cwd = os.path.abspath(os.getcwd())
+        candidates.append(cwd)
+        parent = cwd
+        for _ in range(8):
+            parent = os.path.dirname(parent)
+            candidates.append(parent)
+
+        script_dir = os.path.abspath(os.path.dirname(__file__))
+        candidates.append(script_dir)
+        parent = script_dir
+        for _ in range(8):
+            parent = os.path.dirname(parent)
+            candidates.append(parent)
+
+        for cand in candidates:
+            if (
+                os.path.isdir(os.path.join(cand, "datasets"))
+                and os.path.isdir(os.path.join(cand, "models"))
+                and os.path.isdir(os.path.join(cand, "preprocessing"))
+            ):
+                return cand
+
+        return cwd
+
+    PROJECT_ROOT = find_project_root()
+
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
+
+    DATASETS_ROOT = os.path.join(PROJECT_ROOT, "datasets")
 
     # Save every dataset output inside its own dataset folder:
     # datasets/BGL/PLELog_results/BGL_IBM/
     # datasets/HDFS/PLELog_results/HDFS_IBM/
     # datasets/SP_150MB/PLELog_results/SP_150MB_IBM/
     # datasets/TH_1G/PLELog_results/TH_1G_IBM/
-    save_dir = os.path.join(PROJECT_ROOT, 'datasets', dataset, 'PLELog_results')
-    exp_dir = os.path.join(save_dir, f'{dataset}_{parser}')
+    save_dir = os.path.join(DATASETS_ROOT, dataset, "PLELog_results")
+    exp_dir = os.path.join(save_dir, f"{dataset}_{parser}")
 
-    # Sub-directories
-    output_model_dir = os.path.join(exp_dir, 'model')
-    prob_label_res_dir = os.path.join(exp_dir, 'prob_label_res')
+    output_model_dir = os.path.join(exp_dir, "model")
+    prob_label_res_dir = os.path.join(exp_dir, "prob_label_res")
 
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(exp_dir, exist_ok=True)
@@ -552,8 +591,10 @@ if __name__ == '__main__':
     os.makedirs(prob_label_res_dir, exist_ok=True)
 
     print("\n==============================")
-    print("PLELog output paths")
+    print("PLELog resolved paths")
     print("==============================")
+    print("Project root:", PROJECT_ROOT)
+    print("Datasets root:", DATASETS_ROOT)
     print("Dataset:", dataset)
     print("Save directory:", os.path.abspath(save_dir))
     print("Experiment directory:", os.path.abspath(exp_dir))
@@ -581,52 +622,61 @@ if __name__ == '__main__':
     # ============================================================
     # 1. Dataset paths
     # ============================================================
-    # Important : ----- we copied the datset folder from LWADLS to Exper_LogForm
+    def make_dataset_paths(dataset_name):
+        """
+        Build paths for your current folder structure:
+            ~/PLELog/datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl
+            ~/PLELog/datasets/{dataset}/1_{dataset}_Splitted_Datasets/val_df.pkl
+            ~/PLELog/datasets/{dataset}/1_{dataset}_Splitted_Datasets/test_df.pkl
+        """
+        split_dir = os.path.join(
+            DATASETS_ROOT,
+            dataset_name,
+            f"1_{dataset_name}_Splitted_Datasets"
+        )
+
+        return {
+            "train_pkl": os.path.join(split_dir, "train_df.pkl"),
+            "dev_pkl": os.path.join(split_dir, "val_df.pkl"),
+            "test_pkl": os.path.join(split_dir, "test_df.pkl"),
+        }
+
+    available_dataset_dirs = [
+        name for name in os.listdir(DATASETS_ROOT)
+        if os.path.isdir(os.path.join(DATASETS_ROOT, name))
+    ]
+
     DATASETS = {
-        "BGL": {
-            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "BGL", "1_BGL_Splitted_Datasets", "train_df.pkl"),
-            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "BGL", "1_BGL_Splitted_Datasets", "val_df.pkl"),
-            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "BGL", "1_BGL_Splitted_Datasets", "test_df.pkl"),
-        },
-
-        "HDFS": {
-            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "HDFS", "1_HDFS_Splitted_Datasets", "train_df.pkl"),
-            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "HDFS", "1_HDFS_Splitted_Datasets", "val_df.pkl"),
-            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "HDFS", "1_HDFS_Splitted_Datasets", "test_df.pkl"),
-        },
-
-        "TH_1G": {
-            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "TH_1G", "1_TH_1G_Splitted_Datasets", "train_df.pkl"),
-            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "TH_1G", "1_TH_1G_Splitted_Datasets", "val_df.pkl"),
-            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "TH_1G", "1_TH_1G_Splitted_Datasets", "test_df.pkl"),
-        },
-
-        "SP_150MB": {
-            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB", "1_SP_150MB_Splitted_Datasets", "train_df.pkl"),
-            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB", "1_SP_150MB_Splitted_Datasets", "val_df.pkl"),
-            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB", "1_SP_150MB_Splitted_Datasets", "test_df.pkl"),
-        },
-
-        # Keep this only if you also have datasets/SP_150MB_ratio.
-        "SP_150MB_ratio": {
-            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB_ratio", "1_SP_150MB_ratio_Splitted_Datasets", "train_df.pkl"),
-            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB_ratio", "1_SP_150MB_ratio_Splitted_Datasets", "val_df.pkl"),
-            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB_ratio", "1_SP_150MB_ratio_Splitted_Datasets", "test_df.pkl"),
-        },
+        name: make_dataset_paths(name)
+        for name in available_dataset_dirs
+        if os.path.isdir(
+            os.path.join(DATASETS_ROOT, name, f"1_{name}_Splitted_Datasets")
+        )
     }
 
     if dataset not in DATASETS:
         raise ValueError(
-            f"Unknown dataset '{dataset}'. Available datasets: {list(DATASETS.keys())}"
+            f"Unknown dataset '{dataset}' or split folder not found.\n"
+            f"Expected split folder: "
+            f"{os.path.join(DATASETS_ROOT, dataset, f'1_{dataset}_Splitted_Datasets')}\n"
+            f"Available datasets with split folders: {list(DATASETS.keys())}"
         )
 
-    # Print dataset PKL paths and fail early if something is missing.
     print("\n==============================")
     print("Dataset PKL paths")
     print("==============================")
+    missing_paths = []
     for split_name, split_path in DATASETS[dataset].items():
-        print(f"{split_name}: {os.path.abspath(split_path)} | exists={os.path.exists(split_path)}")
+        exists = os.path.exists(split_path)
+        print(f"{split_name}: {os.path.abspath(split_path)} | exists={exists}")
+        if not exists:
+            missing_paths.append(split_path)
     print("==============================\n")
+
+    if missing_paths:
+        raise FileNotFoundError(
+            "Missing required PKL files:\n" + "\n".join(missing_paths)
+        )
 
     # ============================================================
     # 2. Settings to change
