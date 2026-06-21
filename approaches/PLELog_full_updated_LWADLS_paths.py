@@ -702,26 +702,26 @@ if __name__ == '__main__':
         if base_dir is None:
             base_dir = READ_DATASETS_ROOT
 
-        split_folder = f"3_{dataset_name}_Splitted_Datasets"
+        split_folder = f"1_{dataset_name}_Splitted_Datasets"
 
         return {
             "train_pkl": os.path.join(
                 base_dir,
                 dataset_name,
                 split_folder,
-                f"3_{dataset_name}_train_df.pkl"
+                f"1_{dataset_name}_train_df.pkl"
             ),
             "dev_pkl": os.path.join(
                 base_dir,
                 dataset_name,
                 split_folder,
-                f"3_{dataset_name}_val_df.pkl"
+                f"1_{dataset_name}_val_df.pkl"
             ),
             "test_pkl": os.path.join(
                 base_dir,
                 dataset_name,
                 split_folder,
-                f"3_{dataset_name}_test_df.pkl"
+                f"1_{dataset_name}_test_df.pkl"
             ),
         }
 
