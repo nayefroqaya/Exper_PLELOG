@@ -512,13 +512,14 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str) # target in cross data
+    argparser.add_argument('--dataset', default='BGL', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
     argparser.add_argument('--min_samples', type=int, default=100)
     argparser.add_argument('--reduce_dimension', type=int, default=100)
     argparser.add_argument('--threshold', type=float, default=0.5)
+    argparser.add_argument('--case', default='in_domain', type=str, choices=['in_domain', 'cross_dataset'])
     args, _ = argparser.parse_known_args()
 
     dataset = args.dataset
@@ -528,32 +529,37 @@ if __name__ == '__main__':
     min_samples = args.min_samples
     reduce_dimension = args.reduce_dimension
     threshold = args.threshold
+    case = args.case
 
     # ---------------- Paths ----------------
-    PROJECT_ROOT = '.'  # adjust as needed
-    #save_dir = os.path.join(PROJECT_ROOT, 'outputs')
-    #output_model_dir = os.path.join(save_dir, f'models/PLELog/{dataset}_{parser}/model')
-    #prob_label_res_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
-    #rand_state = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
-    #os.makedirs(output_model_dir, exist_ok=True)
-    # ---------------- Paths ----------------
-    # Base outputs directory
-    save_dir = os.path.join(PROJECT_ROOT, 'outputs')
+    PROJECT_ROOT = '.'  # Run this script from the PLELog project root: ~/PLELog
 
-    # Base experiment directory
-    exp_dir = os.path.join(save_dir, 'results', 'PLELog', f'{dataset}_{parser}')
+    # Save every dataset output inside its own dataset folder:
+    # datasets/BGL/PLELog_results/BGL_IBM/
+    # datasets/HDFS/PLELog_results/HDFS_IBM/
+    # datasets/SP_150MB/PLELog_results/SP_150MB_IBM/
+    # datasets/TH_1G/PLELog_results/TH_1G_IBM/
+    save_dir = os.path.join(PROJECT_ROOT, 'datasets', dataset, 'PLELog_results')
+    exp_dir = os.path.join(save_dir, f'{dataset}_{parser}')
 
     # Sub-directories
     output_model_dir = os.path.join(exp_dir, 'model')
     prob_label_res_dir = os.path.join(exp_dir, 'prob_label_res')
 
-    # CREATE REQUIRED DIRECTORIES
+    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(exp_dir, exist_ok=True)
     os.makedirs(output_model_dir, exist_ok=True)
     os.makedirs(prob_label_res_dir, exist_ok=True)
 
-    # ---------------- Create directories ----------------
-    os.makedirs(output_model_dir, exist_ok=True)
-    os.makedirs(os.path.dirname(prob_label_res_dir), exist_ok=True)
+    print("\n==============================")
+    print("PLELog output paths")
+    print("==============================")
+    print("Dataset:", dataset)
+    print("Save directory:", os.path.abspath(save_dir))
+    print("Experiment directory:", os.path.abspath(exp_dir))
+    print("Model directory:", os.path.abspath(output_model_dir))
+    print("Metrics TXT/JSON will be saved in:", os.path.abspath(exp_dir))
+    print("==============================\n")
     # ---------------- Load PKL ----------------
     # first paper :
     #train_pkl = f'../datasets/{dataset}/1_{dataset}_Splitted_Datasets/train_df.pkl'
@@ -577,30 +583,56 @@ if __name__ == '__main__':
     # ============================================================
     # Important : ----- we copied the datset folder from LWADLS to Exper_LogForm
     DATASETS = {
-        "BGL": {"train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/train_df.pkl",
-            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/val_df.pkl",
-            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/BGL/1_BGL_Splitted_Datasets/test_df.pkl", },
+        "BGL": {
+            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "BGL", "1_BGL_Splitted_Datasets", "train_df.pkl"),
+            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "BGL", "1_BGL_Splitted_Datasets", "val_df.pkl"),
+            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "BGL", "1_BGL_Splitted_Datasets", "test_df.pkl"),
+        },
 
-        "HDFS": {"train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/HDFS/1_HDFS_Splitted_Datasets/train_df.pkl",
-            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/HDFS/1_HDFS_Splitted_Datasets/val_df.pkl",
-            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/HDFS/1_HDFS_Splitted_Datasets/test_df.pkl", },
+        "HDFS": {
+            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "HDFS", "1_HDFS_Splitted_Datasets", "train_df.pkl"),
+            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "HDFS", "1_HDFS_Splitted_Datasets", "val_df.pkl"),
+            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "HDFS", "1_HDFS_Splitted_Datasets", "test_df.pkl"),
+        },
 
         "TH_1G": {
-            "train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/train_df.pkl",
-            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/val_df.pkl",
-            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/TH_1G/1_TH_1G_Splitted_Datasets/test_df.pkl", },
+            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "TH_1G", "1_TH_1G_Splitted_Datasets", "train_df.pkl"),
+            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "TH_1G", "1_TH_1G_Splitted_Datasets", "val_df.pkl"),
+            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "TH_1G", "1_TH_1G_Splitted_Datasets", "test_df.pkl"),
+        },
 
+        "SP_150MB": {
+            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB", "1_SP_150MB_Splitted_Datasets", "train_df.pkl"),
+            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB", "1_SP_150MB_Splitted_Datasets", "val_df.pkl"),
+            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB", "1_SP_150MB_Splitted_Datasets", "test_df.pkl"),
+        },
+
+        # Keep this only if you also have datasets/SP_150MB_ratio.
         "SP_150MB_ratio": {
-            "train_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/SP_150MB_ratio/1_SP_150MB_ratio_Splitted_Datasets/train_df.pkl",
-            "dev_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/SP_150MB_ratio/1_SP_150MB_ratio_Splitted_Datasets/val_df.pkl",
-            "test_pkl": "/storage/home/roqaya/Exper_LogForm/datasets/SP_150MB_ratio/1_SP_150MB_ratio_Splitted_Datasets/test_df.pkl", }, }
+            "train_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB_ratio", "1_SP_150MB_ratio_Splitted_Datasets", "train_df.pkl"),
+            "dev_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB_ratio", "1_SP_150MB_ratio_Splitted_Datasets", "val_df.pkl"),
+            "test_pkl": os.path.join(PROJECT_ROOT, "datasets", "SP_150MB_ratio", "1_SP_150MB_ratio_Splitted_Datasets", "test_df.pkl"),
+        },
+    }
+
+    if dataset not in DATASETS:
+        raise ValueError(
+            f"Unknown dataset '{dataset}'. Available datasets: {list(DATASETS.keys())}"
+        )
+
+    # Print dataset PKL paths and fail early if something is missing.
+    print("\n==============================")
+    print("Dataset PKL paths")
+    print("==============================")
+    for split_name, split_path in DATASETS[dataset].items():
+        print(f"{split_name}: {os.path.abspath(split_path)} | exists={os.path.exists(split_path)}")
+    print("==============================\n")
 
     # ============================================================
     # 2. Settings to change
     # ============================================================
 
-    CASE = "in_domain"
-    #CASE = "cross_dataset"
+    CASE = case
 
     # For in-domain, this uses the same dataset variable from args.dataset
     TARGET_DATASET = dataset
@@ -797,10 +829,15 @@ if __name__ == '__main__':
     train_normal = [i for i, inst in enumerate(train) if inst.label == 'Normal']
     normal_ids = train_normal[:len(train_normal) // 2]
 
-    # Paths to old probabilistic labeling results
-    prob_label_res_file = os.path.join(save_dir,
-                                       f'results/PLELog/{dataset}_{parser}/prob_label_res/mcs-{min_cluster_size}_ms-{min_samples}')
-    rand_state_file = os.path.join(save_dir, f'results/PLELog/{dataset}_{parser}/prob_label_res/random_state')
+    # Paths to probabilistic labeling results inside the dataset folder.
+    prob_label_res_file = os.path.join(
+        prob_label_res_dir,
+        f"mcs-{min_cluster_size}_ms-{min_samples}"
+    )
+    rand_state_file = os.path.join(
+        prob_label_res_dir,
+        "random_state"
+    )
 
     # Remove old probabilistic labeling results safely
     if os.path.exists(prob_label_res_file):
@@ -944,6 +981,12 @@ if __name__ == '__main__':
             best_metrics['recall'] * 100,
             best_metrics['f1_score'] * 100,
             runtime
+        )
+
+    if not results:
+        raise RuntimeError(
+            "No model checkpoint was found. Train first or check the model directory: "
+            + os.path.abspath(output_model_dir)
         )
 
     # ========================= COMPARE =========================
