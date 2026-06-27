@@ -177,66 +177,65 @@ def compute_static_baseline_metrics(
 
 
 def format_static_baseline_metrics(metrics, model_name="PLELog"):
-    """Return a readable text report containing all metric values."""
-    auroc_text = "N/A" if metrics["auroc"] is None else f"{metrics['auroc']:.4f}"
-    auprc_text = "N/A" if metrics["auprc"] is None else f"{metrics['auprc']:.4f}"
-    avg_reward_text = "N/A" if metrics["average_reward"] is None else f"{metrics['average_reward']:.4f}"
+    """
+    Return a compact readable text report with the selected metrics only:
+      - Precision, Recall, F1 for anomaly class
+      - Classification report for class 0 and class 1
+      - Confusion matrix
+      - Important early-detection metrics
+      - FP cost, FN cost, Delay cost
+    """
     avg_step_text = "N/A" if metrics["average_detection_step"] is None else f"{metrics['average_detection_step']:.4f}"
     avg_ratio_text = "N/A" if metrics["average_detection_ratio"] is None else f"{metrics['average_detection_ratio']:.4f}"
-    median_ratio_text = "N/A" if metrics["median_detection_ratio"] is None else f"{metrics['median_detection_ratio']:.4f}"
+
+    class_report_text = metrics.get("classification_report_text", "Classification report was not saved.")
 
     lines = []
     lines.append("#" * 80)
-    lines.append(f"{model_name}: FINAL TEST METRICS")
+    lines.append(f"{model_name}: SELECTED TEST METRICS")
     lines.append("#" * 80)
     lines.append(f"Number of sequences   : {metrics['num_sequences']}")
     lines.append("")
-    lines.append("[Classification Metrics]")
-    lines.append(f"Accuracy              : {metrics['accuracy']:.4f}")
-    lines.append(f"Balanced Accuracy     : {metrics['balanced_accuracy']:.4f}")
+
+    lines.append("[Classification Metrics - Anomaly Class]")
+    lines.append("Positive class        : 1 = anomaly")
     lines.append(f"Precision             : {metrics['precision']:.4f}")
     lines.append(f"Recall / TPR          : {metrics['recall']:.4f}")
-    lines.append(f"Specificity / TNR     : {metrics['specificity_tnr']:.4f}")
     lines.append(f"F1-score              : {metrics['f1_score']:.4f}")
-    lines.append(f"F2-score              : {metrics['f2_score']:.4f}")
-    lines.append(f"FPR                   : {metrics['fpr']:.4f}")
-    lines.append(f"FNR                   : {metrics['fnr']:.4f}")
-    lines.append(f"MCC                   : {metrics['mcc']:.4f}")
-    lines.append(f"AUROC                 : {auroc_text}")
-    lines.append(f"AUPRC                 : {auprc_text}")
     lines.append("")
+
+    lines.append("[Classification Report - Class 0 and Class 1]")
+    lines.append("Class 0               : Normal")
+    lines.append("Class 1               : Anomaly")
+    lines.append("")
+    lines.append(class_report_text.rstrip())
+    lines.append("")
+
     lines.append("[Confusion Matrix]")
     lines.append("Labels: 0=normal, 1=anomaly")
     lines.append(str(np.asarray(metrics["confusion_matrix"])))
     lines.append(f"TP={metrics['tp']} TN={metrics['tn']} FP={metrics['fp']} FN={metrics['fn']}")
     lines.append("")
+
     lines.append("[Early Detection Metrics]")
-    lines.append("PLELog is a full-sequence classifier.")
+    lines.append("PLELog is treated as a static full-sequence classifier.")
     lines.append("Default assumption: detected anomalies are detected at the end of the sequence.")
     lines.append(f"Total anomalies       : {metrics['total_anomalies']}")
     lines.append(f"Detected anomalies    : {metrics['detected_anomalies']}")
     lines.append(f"Detection coverage    : {metrics['anomaly_detection_coverage']:.4f}")
     lines.append(f"Avg detection step    : {avg_step_text}")
     lines.append(f"Avg detection ratio   : {avg_ratio_text}")
-    lines.append(f"Median detect. ratio  : {median_ratio_text}")
-    lines.append(f"EDR@25%               : {metrics['edr_25']:.4f}")
-    lines.append(f"EDR@50%               : {metrics['edr_50']:.4f}")
-    lines.append(f"EDR@75%               : {metrics['edr_75']:.4f}")
+    lines.append(f"EDR@25                : {metrics['edr_25']:.4f}")
+    lines.append(f"EDR@50                : {metrics['edr_50']:.4f}")
+    lines.append(f"EDR@75                : {metrics['edr_75']:.4f}")
     lines.append("")
-    lines.append("[RL Metrics]")
-    lines.append(f"Average reward        : {avg_reward_text}")
-    lines.append(f"Alert rate            : {metrics['alert_rate']:.4f}")
-    lines.append("")
-    lines.append("[Cost Metrics]")
-    lines.append(f"FP unit cost          : {metrics['false_positive_unit_cost']:.4f}")
-    lines.append(f"FN unit cost          : {metrics['false_negative_unit_cost']:.4f}")
-    lines.append(f"Delay unit cost       : {metrics['delay_unit_cost']:.4f}")
-    lines.append(f"FP total cost         : {metrics['false_positive_total_cost']:.4f}")
-    lines.append(f"FN total cost         : {metrics['false_negative_total_cost']:.4f}")
-    lines.append(f"Delay total cost      : {metrics['delay_total_cost']:.4f}")
-    lines.append(f"Total cost            : {metrics['total_cost']:.4f}")
-    lines.append(f"Avg cost / sequence   : {metrics['average_cost_per_sequence']:.4f}")
+
+    lines.append("[Cost-Sensitive Metrics]")
+    lines.append(f"False-positive cost   : {metrics['false_positive_total_cost']:.4f}")
+    lines.append(f"False-negative cost   : {metrics['false_negative_total_cost']:.4f}")
+    lines.append(f"Delay cost            : {metrics['delay_total_cost']:.4f}")
     lines.append("#" * 80)
+
     return "\n".join(lines)
 
 
@@ -444,19 +443,22 @@ class PLELog:
             delay_unit_cost=delay_unit_cost,
         )
 
+        class_report_text = classification_report(
+            y_true,
+            y_pred,
+            labels=[0, 1],
+            target_names=["Normal (0)", "Anomaly (1)"],
+            digits=4,
+            zero_division=0
+        )
+
+        metrics["classification_report_text"] = class_report_text
+
         print()
         print("=" * 70)
         print(f"{model_name}: CLASSIFICATION REPORT")
         print("=" * 70)
-        print(
-            classification_report(
-                y_true,
-                y_pred,
-                target_names=["normal", "anomaly"],
-                digits=4,
-                zero_division=0
-            )
-        )
+        print(class_report_text)
 
         report_text = format_static_baseline_metrics(metrics, model_name=model_name)
         print(report_text)
@@ -512,7 +514,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='TH_1G', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='BGL', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -606,7 +608,8 @@ if __name__ == '__main__':
     print("Save directory:", os.path.abspath(save_dir))
     print("Experiment directory:", os.path.abspath(exp_dir))
     print("Model directory:", os.path.abspath(output_model_dir))
-    print("Metrics TXT/JSON will be saved in:", os.path.abspath(exp_dir))
+    print("Metrics JSON will be saved in:", os.path.abspath(exp_dir))
+    print("Metrics TXT will be saved in:", os.path.abspath(os.path.join(DATASETS_ROOT, dataset)))
     print("==============================\n")
     # ---------------- Load PKL ----------------
     # first paper :
@@ -1069,7 +1072,8 @@ if __name__ == '__main__':
                 "last_model_test_metrics.json"
             ),
             txt_save_path=os.path.join(
-                exp_dir,
+                DATASETS_ROOT,
+                dataset,
                 "last_model_test_metrics.txt"
             ),
             model_name="PLELog LAST MODEL"
@@ -1105,7 +1109,8 @@ if __name__ == '__main__':
                 "best_model_test_metrics.json"
             ),
             txt_save_path=os.path.join(
-                exp_dir,
+                DATASETS_ROOT,
+                dataset,
                 "best_model_test_metrics.txt"
             ),
             model_name="PLELog BEST MODEL"
