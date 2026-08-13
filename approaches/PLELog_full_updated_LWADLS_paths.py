@@ -765,7 +765,7 @@ if __name__ == '__main__':
             "Missing required PKL files for dataset " + dataset + ":\n"
             + "\n".join(os.path.abspath(p) for p in missing_paths)
             + "\n\nUse --data_root to point to your LWADLS datasets folder. Example:\n"
-            + "python PLELog_full_updated.py --dataset SP_150MB_ratio --data_root ../../LWADLS/datasets"
+            + "python PLELog_full_updated.py --dataset BGL --data_root ../../LWADLS/datasets"
         )
 
     # ============================================================
