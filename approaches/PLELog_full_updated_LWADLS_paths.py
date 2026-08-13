@@ -514,7 +514,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='HDFS', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='TH_1G', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -765,7 +765,7 @@ if __name__ == '__main__':
             "Missing required PKL files for dataset " + dataset + ":\n"
             + "\n".join(os.path.abspath(p) for p in missing_paths)
             + "\n\nUse --data_root to point to your LWADLS datasets folder. Example:\n"
-            + "python PLELog_full_updated.py --dataset HDFS --data_root ../../LWADLS/datasets"
+            + "python PLELog_full_updated.py --dataset TH_1G --data_root ../../LWADLS/datasets"
         )
 
     # ============================================================
