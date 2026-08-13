@@ -514,14 +514,14 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='TH_1G', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='HDFS', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
     argparser.add_argument('--min_samples', type=int, default=100)
     argparser.add_argument('--reduce_dimension', type=int, default=100)
     argparser.add_argument('--threshold', type=float, default=0.5)
-    argparser.add_argument('--case', default='in_domain', type=str, choices=['in_domain', 'cross_dataset'])
+    argparser.add_argument('--case', default='cross_dataset', type=str, choices=['in_domain', 'cross_dataset'])
     argparser.add_argument(
         '--data_root',
         default='../../LWADLS/datasets',
@@ -765,7 +765,7 @@ if __name__ == '__main__':
             "Missing required PKL files for dataset " + dataset + ":\n"
             + "\n".join(os.path.abspath(p) for p in missing_paths)
             + "\n\nUse --data_root to point to your LWADLS datasets folder. Example:\n"
-            + "python PLELog_full_updated.py --dataset TH_1G --data_root ../../LWADLS/datasets"
+            + "python PLELog_full_updated.py --dataset HDFS --data_root ../../LWADLS/datasets"
         )
 
     # ============================================================
@@ -778,7 +778,7 @@ if __name__ == '__main__':
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["HDFS", "TH_1G", "BGL"]
+    SOURCE_DATASETS = ["BGL"]
     TARGET_NORMAL_FRACTION = 0.20
     RANDOM_SEED = 42
 
