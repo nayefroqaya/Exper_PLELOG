@@ -514,7 +514,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='BGL', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -1134,12 +1134,12 @@ if __name__ == '__main__':
     # ========================= COMPARE =========================
     print("\n=========== FINAL TEST RESULTS ===========")
     for k, (p, r, f, t) in results.items():
-        print(f"{k} MODEL | Precision={p:.4f} Recall={r:.4f} F1={f:.4f} Time={t:.2f} min")
+        print(f"{k} MODEL | Precision={p:.4f} Recall={r:.4f} F1={f:.4f} Time={t:.4f} min")
 
     winner = max(results.items(), key=lambda x: x[1][2])[0]
     print(f"\n🏆 Best model on TEST set: {winner}")
     print("=========================================")
-    print(f"\nTotal training time: {Estimated_training_time:.2f} minutes")
+    print(f"\nTotal training time: {Estimated_training_time:.4f} minutes")
 
     print("All Finished ✅")
 
