@@ -514,7 +514,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='TH_1G', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -765,7 +765,7 @@ if __name__ == '__main__':
             "Missing required PKL files for dataset " + dataset + ":\n"
             + "\n".join(os.path.abspath(p) for p in missing_paths)
             + "\n\nUse --data_root to point to your LWADLS datasets folder. Example:\n"
-            + "python PLELog_full_updated.py --dataset SP_150MB_ratio --data_root ../../LWADLS/datasets"
+            + "python PLELog_full_updated.py --dataset TH_1G --data_root ../../LWADLS/datasets"
         )
 
     # ============================================================
@@ -778,7 +778,7 @@ if __name__ == '__main__':
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["BGL","HDFS","TH_1G"]
+    SOURCE_DATASETS = ["BGL","HDFS","SP_150MB_ratio"]
     TARGET_NORMAL_FRACTION = 0.20
     RANDOM_SEED = 42
 
