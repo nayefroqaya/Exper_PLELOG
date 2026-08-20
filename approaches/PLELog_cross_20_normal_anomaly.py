@@ -11,6 +11,52 @@ import time
 from utils.common import get_precision_recall
 import shutil
 import json
+from contextlib import contextmanager
+try:
+    from tqdm.auto import tqdm
+except ImportError:
+    # Lightweight fallback so the script still runs without tqdm.
+    class tqdm:
+        def __init__(self, iterable=None, total=None, desc=None, unit=None, leave=True, **kwargs):
+            self.iterable = iterable
+            self.total = total
+            self.desc = desc or "Progress"
+            self.n = 0
+            if iterable is not None and total is None:
+                try:
+                    self.total = len(iterable)
+                except Exception:
+                    self.total = None
+            print(f"[{self.desc}] started")
+
+        def __iter__(self):
+            for item in self.iterable:
+                yield item
+                self.update(1)
+            self.close()
+
+        def update(self, n=1):
+            self.n += n
+            if self.total:
+                pct = 100.0 * self.n / max(1, self.total)
+                print(f"\r[{self.desc}] {self.n}/{self.total} ({pct:.1f}%)", end="", flush=True)
+
+        def set_postfix(self, *args, **kwargs):
+            pass
+
+        def set_description(self, desc=None, refresh=True):
+            if desc is not None:
+                self.desc = desc
+
+        def close(self):
+            print()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.close()
+
 
 from sklearn.metrics import (
     accuracy_score,
@@ -495,6 +541,19 @@ class PLELog:
         print(f"Cleared all contents of: {folder_path}")
 
 
+@contextmanager
+def blocking_stage(description):
+    """Show an indeterminate-looking tqdm indicator around a blocking operation."""
+    bar = tqdm(total=1, desc=description, unit="stage", dynamic_ncols=True)
+    start = time.time()
+    try:
+        yield
+    finally:
+        bar.update(1)
+        bar.close()
+        print(f"{description} finished in {(time.time() - start):.2f} s")
+
+
 if __name__ == '__main__':
     print('start main function ......')
 
@@ -514,7 +573,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='HDFS', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='TH_1G', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -824,11 +883,21 @@ if __name__ == '__main__':
         # Load source datasets
         # ------------------------------------------------------------
 
-        for source_dataset in SOURCE_DATASETS:
+        for source_dataset in tqdm(
+            SOURCE_DATASETS,
+            desc="Loading source datasets",
+            unit="dataset",
+            dynamic_ncols=True
+        ):
             source_paths = DATASETS[source_dataset]
 
-            source_train, source_dev, source_test = processor.load_pkl(source_dataset, source_paths["train_pkl"],
-                source_paths["dev_pkl"], source_paths["test_pkl"])
+            with blocking_stage(f"Load/preprocess source {source_dataset}"):
+                source_train, source_dev, source_test = processor.load_pkl(
+                    source_dataset,
+                    source_paths["train_pkl"],
+                    source_paths["dev_pkl"],
+                    source_paths["test_pkl"]
+                )
 
             all_source_train.extend(source_train)
             all_source_dev.extend(source_dev)
@@ -844,8 +913,13 @@ if __name__ == '__main__':
 
         target_paths = DATASETS[TARGET_DATASET]
 
-        target_train, target_dev, target_test = processor.load_pkl(TARGET_DATASET, target_paths["train_pkl"],
-            target_paths["dev_pkl"], target_paths["test_pkl"])
+        with blocking_stage(f"Load/preprocess target {TARGET_DATASET}"):
+            target_train, target_dev, target_test = processor.load_pkl(
+                TARGET_DATASET,
+                target_paths["train_pkl"],
+                target_paths["dev_pkl"],
+                target_paths["test_pkl"]
+            )
 
         # ------------------------------------------------------------
         # Take 20% of target train INCLUDING Normal and Anomaly
@@ -857,15 +931,20 @@ if __name__ == '__main__':
         #   COMPLETE target training set, NOT 40%.
         # ------------------------------------------------------------
 
-        target_normal_train = [
-            inst for inst in target_train
-            if inst.label == "Normal"
-        ]
+        target_normal_train = []
+        target_anomaly_train = []
 
-        target_anomaly_train = [
-            inst for inst in target_train
-            if inst.label == "Anomaly"
-        ]
+        for inst in tqdm(
+            target_train,
+            total=len(target_train),
+            desc="Scanning target labels",
+            unit="sequence",
+            dynamic_ncols=True
+        ):
+            if inst.label == "Normal":
+                target_normal_train.append(inst)
+            elif inst.label == "Anomaly":
+                target_anomaly_train.append(inst)
 
         number_normal_to_take = int(
             len(target_normal_train) * TARGET_TRAIN_FRACTION
@@ -921,7 +1000,6 @@ if __name__ == '__main__':
 
     else:
         raise ValueError("CASE must be either 'in_domain' or 'cross_dataset'")
-        exit()
 
     # ============================================================
     # 5. Final print
@@ -943,7 +1021,14 @@ if __name__ == '__main__':
 
     # ---------------- Embeddings ----------------
     all_event_ids = set()
-    for inst in train + dev + test:
+    all_instances_for_vocab = train + dev + test
+    for inst in tqdm(
+        all_instances_for_vocab,
+        total=len(all_instances_for_vocab),
+        desc="Collecting event IDs",
+        unit="sequence",
+        dynamic_ncols=True
+    ):
         all_event_ids.update(inst.sequence)
 
     embedding_dim = 50
@@ -951,13 +1036,38 @@ if __name__ == '__main__':
 
     # ---------------- Sequence representation ----------------
     encoder = Sequential_TF(processor.embedding)
-    for inst, vec in zip(train, encoder.present(train)):
+
+    with blocking_stage("Compute train representations"):
+        train_presented = encoder.present(train)
+    for inst, vec in tqdm(
+        zip(train, train_presented),
+        total=len(train),
+        desc="Assign train representations",
+        unit="sequence",
+        dynamic_ncols=True
+    ):
         inst.repr = vec
 
-    for inst, vec in zip(dev, encoder.present(dev)):
+    with blocking_stage("Compute dev representations"):
+        dev_presented = encoder.present(dev)
+    for inst, vec in tqdm(
+        zip(dev, dev_presented),
+        total=len(dev),
+        desc="Assign dev representations",
+        unit="sequence",
+        dynamic_ncols=True
+    ):
         inst.repr = vec
 
-    for inst, vec in zip(test, encoder.present(test)):
+    with blocking_stage("Compute test representations"):
+        test_presented = encoder.present(test)
+    for inst, vec in tqdm(
+        zip(test, test_presented),
+        total=len(test),
+        desc="Assign test representations",
+        unit="sequence",
+        dynamic_ncols=True
+    ):
         inst.repr = vec
     # ---------------- Dimension Reduction (FastICA) ----------------
     train_reprs = np.array([inst.repr for inst in train])
@@ -974,27 +1084,49 @@ if __name__ == '__main__':
 
         # Standardize
         scaler = StandardScaler()
-        train_reprs = scaler.fit_transform(train_reprs)
+        with blocking_stage("Standardize train representations"):
+            train_reprs = scaler.fit_transform(train_reprs)
         train_reprs = np.nan_to_num(train_reprs, nan=0.0, posinf=1e6, neginf=-1e6)
 
         # Fit ICA on train
         transformer = FastICA(n_components=reduce_dimension, random_state=0)
-        train_reprs = transformer.fit_transform(train_reprs)
+        with blocking_stage("Fit FastICA on train"):
+            train_reprs = transformer.fit_transform(train_reprs)
 
         # Assign back to train
-        for idx, inst in enumerate(train):
+        for idx, inst in tqdm(
+            enumerate(train),
+            total=len(train),
+            desc="Store ICA train vectors",
+            unit="sequence",
+            dynamic_ncols=True
+        ):
             inst.repr = train_reprs[idx]
 
         # --- CHANGE / ADD: Transform dev using SAME scaler + ICA ---
-        dev_reprs = scaler.transform(dev_reprs)
-        dev_reprs = transformer.transform(dev_reprs)
-        for idx, inst in enumerate(dev):
-            inst.repr = dev_reprs[idx]  # <-- Added
+        with blocking_stage("Transform dev with scaler + ICA"):
+            dev_reprs = scaler.transform(dev_reprs)
+            dev_reprs = transformer.transform(dev_reprs)
+        for idx, inst in tqdm(
+            enumerate(dev),
+            total=len(dev),
+            desc="Store ICA dev vectors",
+            unit="sequence",
+            dynamic_ncols=True
+        ):
+            inst.repr = dev_reprs[idx]
 
         # Transform test set
-        test_reprs = scaler.transform(test_reprs)
-        test_reprs = transformer.transform(test_reprs)
-        for idx, inst in enumerate(test):
+        with blocking_stage("Transform test with scaler + ICA"):
+            test_reprs = scaler.transform(test_reprs)
+            test_reprs = transformer.transform(test_reprs)
+        for idx, inst in tqdm(
+            enumerate(test),
+            total=len(test),
+            desc="Store ICA test vectors",
+            unit="sequence",
+            dynamic_ncols=True
+        ):
             inst.repr = test_reprs[idx]
 
         print(f"Finished FastICA in {time.time() - start_time:.2f} seconds")
@@ -1033,7 +1165,8 @@ if __name__ == '__main__':
 
     label_generator = Probabilistic_Labeling(min_samples=min_samples, min_clust_size=min_cluster_size,
         res_file=prob_label_res_file, rand_state_file=rand_state_file)
-    labeled_train = label_generator.auto_label(train, normal_ids)
+    with blocking_stage("PLELog probabilistic labeling"):
+        labeled_train = label_generator.auto_label(train, normal_ids)
 
     # ---------------- Model ----------------
     vocab = Vocab()
@@ -1053,13 +1186,33 @@ if __name__ == '__main__':
         bestF = 0.0
         start_train = time.time()
 
-        for epoch in range(epochs):
-            plelog.model.train()
-            for onebatch in data_iter(labeled_train, batch_size, True):
-                tinst = generate_tinsts_binary_label(onebatch, vocab)
-                tinst.to_device(device)  # only CPU
-                #tinst.to_cuda(device)
+        num_train_batches = max(1, (len(labeled_train) + batch_size - 1) // batch_size)
 
+        epoch_bar = tqdm(
+            range(epochs),
+            total=epochs,
+            desc="Training epochs",
+            unit="epoch",
+            dynamic_ncols=True
+        )
+
+        for epoch in epoch_bar:
+            plelog.model.train()
+            running_loss = 0.0
+            seen_batches = 0
+
+            batch_bar = tqdm(
+                data_iter(labeled_train, batch_size, True),
+                total=num_train_batches,
+                desc=f"Epoch {epoch + 1}/{epochs}",
+                unit="batch",
+                leave=False,
+                dynamic_ncols=True
+            )
+
+            for onebatch in batch_bar:
+                tinst = generate_tinsts_binary_label(onebatch, vocab)
+                tinst.to_device(device)
 
                 loss = plelog.forward(tinst.inputs, tinst.targets)
                 loss.backward()
@@ -1068,9 +1221,19 @@ if __name__ == '__main__':
                 optimizer.step()
                 plelog.model.zero_grad()
 
+                seen_batches += 1
+                running_loss += float(loss.item())
+                batch_bar.set_postfix(
+                    loss=f"{loss.item():.4f}",
+                    avg=f"{running_loss / seen_batches:.4f}"
+                )
+
             # ---- DEV evaluation ----
             if dev:
-                p_dev, r_dev, f_dev = plelog.evaluate(dev, threshold)
+                with blocking_stage(f"Evaluate dev after epoch {epoch + 1}"):
+                    p_dev, r_dev, f_dev = plelog.evaluate(dev, threshold)
+
+                epoch_bar.set_postfix(dev_f1=f"{f_dev:.4f}")
                 print(f"[DEV] Epoch {epoch + 1} | F1={f_dev:.4f}")
 
                 if f_dev > bestF:
@@ -1176,4 +1339,3 @@ if __name__ == '__main__':
     print(f"\nTotal training time: {Estimated_training_time:.4f} minutes")
 
     print("All Finished ✅")
-
