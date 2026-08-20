@@ -11,6 +11,7 @@ import time
 from utils.common import get_precision_recall
 import shutil
 import json
+import threading
 from contextlib import contextmanager
 try:
     from tqdm.auto import tqdm
@@ -43,6 +44,9 @@ except ImportError:
 
         def set_postfix(self, *args, **kwargs):
             pass
+
+        def set_postfix_str(self, s="", refresh=True):
+            print(f"\r[{self.desc}] {self.n} sec | {s}", end="", flush=True)
 
         def set_description(self, desc=None, refresh=True):
             if desc is not None:
@@ -543,15 +547,41 @@ class PLELog:
 
 @contextmanager
 def blocking_stage(description):
-    """Show an indeterminate-looking tqdm indicator around a blocking operation."""
-    bar = tqdm(total=1, desc=description, unit="stage", dynamic_ncols=True)
+    """
+    Show a LIVE activity indicator for operations whose internal row count
+    is not visible from this script (for example PKLPreprocessor.load_pkl).
+
+    This is intentionally NOT a fake percentage. The counter advances once
+    per second so you can see that the process is still alive.
+    """
+    stop_event = threading.Event()
     start = time.time()
+
+    bar = tqdm(
+        total=None,
+        desc=description,
+        unit="sec",
+        dynamic_ncols=True,
+        leave=True
+    )
+
+    def _pulse():
+        while not stop_event.wait(1.0):
+            bar.update(1)
+            elapsed = time.time() - start
+            bar.set_postfix_str(f"elapsed={elapsed:.0f}s", refresh=True)
+
+    pulse_thread = threading.Thread(target=_pulse, daemon=True)
+    pulse_thread.start()
+
     try:
         yield
     finally:
-        bar.update(1)
+        stop_event.set()
+        pulse_thread.join(timeout=2.0)
         bar.close()
-        print(f"{description} finished in {(time.time() - start):.2f} s")
+        elapsed = time.time() - start
+        print(f"{description} finished in {elapsed:.2f} s")
 
 
 if __name__ == '__main__':
