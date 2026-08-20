@@ -949,13 +949,28 @@ if __name__ == '__main__':
         ):
             source_paths = DATASETS[source_dataset]
 
-            with blocking_stage(f"Load/preprocess source {source_dataset} [estimated %]", expected_seconds=120):
-                source_train, source_dev, source_test = processor.load_pkl(
+            # IMPORTANT:
+            # Source TEST is NOT needed in cross-domain training/evaluation.
+            #
+            # PKLPreprocessor.load_pkl() currently requires three file paths.
+            # To avoid opening/preprocessing the real source test.pkl, pass
+            # source DEV as the third (dummy) argument and discard that result.
+            #
+            # This keeps compatibility with the existing PKLPreprocessor while
+            # completely avoiding the source test file.
+            with blocking_stage(
+                f"Load source {source_dataset} train/dev [estimated %]",
+                expected_seconds=120
+            ):
+                source_train, source_dev, _unused_dev_copy = processor.load_pkl(
                     source_dataset,
                     source_paths["train_pkl"],
                     source_paths["dev_pkl"],
-                    source_paths["test_pkl"]
+                    source_paths["dev_pkl"]   # dummy third split; source test NOT loaded
                 )
+
+            # Release the duplicate dev result immediately.
+            del _unused_dev_copy
 
             all_source_train.extend(source_train)
             all_source_dev.extend(source_dev)
@@ -963,7 +978,7 @@ if __name__ == '__main__':
             print("\nLoaded source dataset:", source_dataset)
             print("Source train:", len(source_train))
             print("Source dev:", len(source_dev))
-            print("Source test not used:", len(source_test))
+            print("Source test: NOT LOADED")
 
         # ------------------------------------------------------------
         # Load target dataset
@@ -971,7 +986,12 @@ if __name__ == '__main__':
 
         target_paths = DATASETS[TARGET_DATASET]
 
-        with blocking_stage(f"Load/preprocess target {TARGET_DATASET} [estimated %]", expected_seconds=120):
+        # Target TEST is required for the final prediction/evaluation.
+        # It is never added to the training set.
+        with blocking_stage(
+            f"Load target {TARGET_DATASET} train/dev/test [estimated %]",
+            expected_seconds=120
+        ):
             target_train, target_dev, target_test = processor.load_pkl(
                 TARGET_DATASET,
                 target_paths["train_pkl"],
@@ -1035,6 +1055,13 @@ if __name__ == '__main__':
         # Important:
         # target test is untouched
         test = target_test
+
+        print("\nCross-domain protocol:")
+        print("  Source train     : USED")
+        print("  Source dev       : USED")
+        print("  Source test      : NOT LOADED")
+        print("  Target train     : 20% stratified Normal + Anomaly")
+        print("  Target test      : FINAL prediction/evaluation only")
 
         print("\n==============================")
         print("Final cross-dataset data")
