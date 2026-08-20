@@ -546,30 +546,48 @@ class PLELog:
 
 
 @contextmanager
-def blocking_stage(description):
+def blocking_stage(description, expected_seconds=120):
     """
-    Show a LIVE activity indicator for operations whose internal row count
-    is not visible from this script (for example PKLPreprocessor.load_pkl).
+    Show a percentage bar for a blocking operation whose internal row count
+    is not exposed by this script (for example PKLPreprocessor.load_pkl).
 
-    This is intentionally NOT a fake percentage. The counter advances once
-    per second so you can see that the process is still alive.
+    IMPORTANT:
+    - 0..95% is an ESTIMATED activity percentage based on elapsed time.
+    - 100% is shown only when the blocking operation actually returns.
+    - Exact row-level percentages are used elsewhere whenever the iterable
+      length is known.
     """
     stop_event = threading.Event()
     start = time.time()
 
     bar = tqdm(
-        total=None,
+        total=100,
+        initial=0,
         desc=description,
-        unit="sec",
+        unit="%",
         dynamic_ncols=True,
         leave=True
     )
 
     def _pulse():
+        last_pct = 0
         while not stop_event.wait(1.0):
-            bar.update(1)
             elapsed = time.time() - start
-            bar.set_postfix_str(f"elapsed={elapsed:.0f}s", refresh=True)
+
+            # Smooth estimated progress that approaches, but never exceeds, 95%
+            # until the operation really completes.
+            estimated_pct = int(
+                min(95, 95 * (1.0 - pow(2.718281828, -elapsed / max(1.0, expected_seconds))))
+            )
+
+            if estimated_pct > last_pct:
+                bar.update(estimated_pct - last_pct)
+                last_pct = estimated_pct
+
+            bar.set_postfix_str(
+                f"estimated | elapsed={elapsed:.0f}s",
+                refresh=True
+            )
 
     pulse_thread = threading.Thread(target=_pulse, daemon=True)
     pulse_thread.start()
@@ -579,8 +597,18 @@ def blocking_stage(description):
     finally:
         stop_event.set()
         pulse_thread.join(timeout=2.0)
-        bar.close()
+
+        # Only mark 100% after the operation has genuinely completed.
+        remaining = 100 - bar.n
+        if remaining > 0:
+            bar.update(remaining)
+
         elapsed = time.time() - start
+        bar.set_postfix_str(
+            f"completed | elapsed={elapsed:.0f}s",
+            refresh=True
+        )
+        bar.close()
         print(f"{description} finished in {elapsed:.2f} s")
 
 
@@ -921,7 +949,7 @@ if __name__ == '__main__':
         ):
             source_paths = DATASETS[source_dataset]
 
-            with blocking_stage(f"Load/preprocess source {source_dataset}"):
+            with blocking_stage(f"Load/preprocess source {source_dataset} [estimated %]", expected_seconds=120):
                 source_train, source_dev, source_test = processor.load_pkl(
                     source_dataset,
                     source_paths["train_pkl"],
@@ -943,7 +971,7 @@ if __name__ == '__main__':
 
         target_paths = DATASETS[TARGET_DATASET]
 
-        with blocking_stage(f"Load/preprocess target {TARGET_DATASET}"):
+        with blocking_stage(f"Load/preprocess target {TARGET_DATASET} [estimated %]", expected_seconds=120):
             target_train, target_dev, target_test = processor.load_pkl(
                 TARGET_DATASET,
                 target_paths["train_pkl"],
