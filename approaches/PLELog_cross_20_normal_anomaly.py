@@ -638,7 +638,7 @@ if __name__ == '__main__':
     argparser.add_argument('--min_samples', type=int, default=100)
     argparser.add_argument('--reduce_dimension', type=int, default=100)
     argparser.add_argument('--threshold', type=float, default=0.5)
-    argparser.add_argument('--case', default='cross_dataset', type=str, choices=['in_domain', 'cross_dataset'])
+    argparser.add_argument('--case', default='in_domain', type=str, choices=['in_domain', 'cross_dataset'])
     argparser.add_argument(
         '--data_root',
         default='../../LWADLS/datasets',
@@ -895,8 +895,8 @@ if __name__ == '__main__':
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["TH_1G","HDFS"]
-    TARGET_TRAIN_FRACTION = 0.20
+    #SOURCE_DATASETS = ["TH_1G","HDFS"]
+    #TARGET_TRAIN_FRACTION = 0.20
     RANDOM_SEED = 42
 
     # ============================================================
