@@ -895,7 +895,7 @@ if __name__ == '__main__':
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["BGL","HDFS","SP_150MB_ratio"]
+    SOURCE_DATASETS = ["BGL","HDFS"]
     TARGET_TRAIN_FRACTION = 0.20
     RANDOM_SEED = 42
 
