@@ -302,7 +302,7 @@ if __name__ == '__main__':
     TARGET_DATASET = dataset
 
     # For cross-dataset only
-    SOURCE_DATASETS = ["HDFS", "TH_1G", "BGL"]
+    SOURCE_DATASETS = ["TH_1G"]
     TARGET_NORMAL_FRACTION = 0.20
     RANDOM_SEED = 42
 
