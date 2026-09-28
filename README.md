@@ -110,7 +110,7 @@ To those who are interested in applying PLELog on their log data, please refer t
 - **Step 3:** Create a new dataloader class implementing `BasicLoader`. 
 - **Step 4:** Go to `preprocessing/Preprocess.py` and add your new log data into acceptable variables.
 
-## Contact
+## Original Authers: 
 
 We are happy to see `PLELog` being applied in the real world and willing to contribute to the community. Feel free to contact us if you have any question!
 Authors information:
@@ -122,3 +122,40 @@ Authors information:
 | Weijing Wang  | wangweijing@tju.edu.cn |
 
 \* *corresponding author*
+
+### Re-implementation and running :
+
+# Cross domain (20% Normal only for training)
+- With assumption you run the log parser in proposed paper code, our PKL files are ready. 
+- Set the path to data folder. 
+- go to approaches folder.
+- Open the file : PLELog_cross_20_only_normal.py
+- Set the SOURCE_DATASETS : e.g - ["TH_1G"]
+- Target data :argparser.add_argument('--dataset', default='BGL', type=str)  
+- Set default to cross_dataset : argparser.add_argument('--case', default='cross_dataset', type=str, choices=['in_domain', 'cross_dataset'])
+
+- run : python PLELog_cross_20_only_normal.py
+
+
+# Cross domain (20% Normal + 20% Anomaly  for training)
+- With assumption you run the log parser in proposed paper code, our PKL files are ready. 
+- Set the path to data folder. default='../../LWADLS/datasets'
+- go to approaches folder.
+- Open the file : PLELog_cross_20_normal_anomaly.py
+- Set the SOURCE_DATASETS : e.g - ["TH_1G"]
+- Target data :argparser.add_argument('--dataset', default='BGL', type=str)  
+- Set default to cross_dataset : argparser.add_argument('--case', default='cross_dataset', type=str, choices=['in_domain', 'cross_dataset'])
+- run : python PLELog_cross_20_normal_anomaly.py
+
+
+# In domain :
+- With assumption you run the log parser in proposed paper code, our PKL files are ready. 
+- Set the path to data folder. default='../../LWADLS/datasets'
+- go to approaches folder.
+- Open the file : PLELog_in_domain_20_normal_anomaly.py
+- Set the SOURCE_DATASETS : e.g - ["TH_1G"]
+- Target data :argparser.add_argument('--dataset', default='BGL', type=str)  
+- Set default to in_domain : argparser.add_argument('--case', default='cross_dataset', type=str, choices=['in_domain', 'cross_dataset'])
+- run : python PLELog_in_domain_20_normal_anomaly.py
+
+
