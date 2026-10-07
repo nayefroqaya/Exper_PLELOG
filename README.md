@@ -134,7 +134,7 @@ Authors information:
 - Target data :argparser.add_argument('--dataset', default='BGL', type=str)  
 - Set default to cross_dataset : argparser.add_argument('--case', default='cross_dataset', type=str, choices=['in_domain', 'cross_dataset'])
 
-- run : python PLELog_cross_20_only_normal.py
+- run : ### python PLELog_cross_20_only_normal.py
 
 
 ### Cross domain (20% Normal + 20% Anomaly  for training)
