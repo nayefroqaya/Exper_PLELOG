@@ -153,9 +153,8 @@ Authors information:
 - Set the path to data folder. default='../../LWADLS/datasets'
 - go to approaches folder.
 - Open the file : PLELog_in_domain_20_normal_anomaly.py
-- Set the SOURCE_DATASETS : e.g - ["TH_1G"]
-- Target data :argparser.add_argument('--dataset', default='BGL', type=str)  
-- Set default to in_domain : argparser.add_argument('--case', default='cross_dataset', type=str, choices=['in_domain', 'cross_dataset'])
+- Target data :argparser.add_argument('--dataset', default='BGL', type=str)  # One one dataset in domain 
+- Set default to in_domain : argparser.add_argument('--case', default='in_domain', type=str, choices=['in_domain', 'cross_dataset'])
 - run : python PLELog_in_domain_20_normal_anomaly.py
 
 
