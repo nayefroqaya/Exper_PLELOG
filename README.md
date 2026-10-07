@@ -123,9 +123,9 @@ Authors information:
 
 \* *corresponding author*
 
-### Re-implementation and running :
+# Re-implementation and running the code :
 
-# Cross domain (20% Normal only for training)
+### Cross domain (20% Normal only for training)
 - With assumption you run the log parser in proposed paper code, our PKL files are ready. 
 - Set the path to data folder. 
 - go to approaches folder.
@@ -137,7 +137,7 @@ Authors information:
 - run : python PLELog_cross_20_only_normal.py
 
 
-# Cross domain (20% Normal + 20% Anomaly  for training)
+### Cross domain (20% Normal + 20% Anomaly  for training)
 - With assumption you run the log parser in proposed paper code, our PKL files are ready. 
 - Set the path to data folder. default='../../LWADLS/datasets'
 - go to approaches folder.
@@ -148,7 +148,7 @@ Authors information:
 - run : python PLELog_cross_20_normal_anomaly.py
 
 
-# In domain :
+### In domain :
 - With assumption you run the log parser in proposed paper code, our PKL files are ready. 
 - Set the path to data folder. default='../../LWADLS/datasets'
 - go to approaches folder.
