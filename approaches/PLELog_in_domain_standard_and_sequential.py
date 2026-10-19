@@ -742,6 +742,7 @@ def save_standard_vs_sequential_comparison(
         ("mcc", "MCC"),
         ("auroc", "AUROC"),
         ("auprc", "AUPRC"),
+        ("anomaly_detection_coverage", "Detection Coverage"),
         ("average_detection_step", "Avg Detection Step"),
         ("average_detection_ratio", "Avg Detection Ratio"),
         ("median_detection_ratio", "Median Detection Ratio"),
@@ -749,8 +750,8 @@ def save_standard_vs_sequential_comparison(
         ("edr_50", "EDR@50"),
         ("edr_75", "EDR@75"),
         ("alert_rate", "Alert Rate"),
-        ("false_positive_total_cost", "FP Cost"),
-        ("false_negative_total_cost", "FN Cost"),
+        ("false_positive_total_cost", "False-positive Cost"),
+        ("false_negative_total_cost", "False-negative Cost"),
         ("delay_total_cost", "Delay Cost"),
         ("total_cost", "Total Cost"),
         ("average_cost_per_sequence", "Avg Cost / Sequence"),
@@ -1135,7 +1136,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='BGL', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='TH_1G', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
