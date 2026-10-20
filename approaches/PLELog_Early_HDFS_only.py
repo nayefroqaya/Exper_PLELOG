@@ -1354,7 +1354,7 @@ if __name__ == '__main__':
     )
     argparser.add_argument(
         '--prefix_batch_size',
-        default=128,
+        default=32,
         type=int,
         help=(
             "Number of prefixes from ONE sequence evaluated together. "
