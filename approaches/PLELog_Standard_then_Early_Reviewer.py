@@ -15,6 +15,7 @@ import copy
 import threading
 import subprocess
 from contextlib import contextmanager
+import colorama
 try:
     from tqdm.auto import tqdm
 except ImportError:
