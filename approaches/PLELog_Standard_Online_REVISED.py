@@ -1,4 +1,5 @@
 import sys
+import sys
 print("Imported _1 ")
 import os
 #os.environ["CUDA_VISIBLE_DEVICES"] = ""   # ⛔ Disable GPU completely
@@ -98,201 +99,8 @@ batch_size = 100
 epochs = 20 #5
 print('beging ------')
 
-# ============================================================
-# Minimal early-aware training augmentation
-# ============================================================
-EARLY_TRAINING_ENABLED = True
-TRAIN_PREFIX_RATIOS = (0.25, 0.50, 0.75)
-
-
-def _event_is_anomaly(value):
-    """Convert common event-level label formats to a binary anomaly flag."""
-    if isinstance(value, (bool, np.bool_)):
-        return bool(value)
-
-    if isinstance(value, (int, float, np.integer, np.floating)):
-        return float(value) != 0.0
-
-    if isinstance(value, str):
-        v = value.strip().lower()
-        normal_values = {
-            "normal", "0", "false", "benign", "negative", "-", "none", ""
-        }
-        anomaly_values = {
-            "anomaly", "anomalous", "1", "true", "abnormal",
-            "positive", "error", "attack"
-        }
-        if v in anomaly_values:
-            return True
-        if v in normal_values:
-            return False
-
-    return None
-
-
-def _find_event_level_labels(inst):
-    """
-    Find event-level labels already stored in an instance.
-    Only metadata with exactly one label per event is accepted.
-    """
-    candidate_attrs = (
-        "event_labels",
-        "sequence_labels",
-        "line_labels",
-        "anomaly_flags",
-        "event_anomalies",
-        "token_labels",
-    )
-
-    sequence = list(getattr(inst, "sequence", []))
-    T = len(sequence)
-
-    for attr in candidate_attrs:
-        if not hasattr(inst, attr):
-            continue
-
-        values = getattr(inst, attr)
-        if values is None or isinstance(values, (str, bytes)):
-            continue
-
-        try:
-            values = list(values)
-        except Exception:
-            continue
-
-        if len(values) != T:
-            continue
-
-        converted = [_event_is_anomaly(v) for v in values]
-        if all(v is not None for v in converted):
-            return converted, attr
-
-    return None, None
-
-
-def build_early_training_instances(original_train, prefix_ratios=TRAIN_PREFIX_RATIOS):
-    """
-    Add a small number of prefix samples to TRAIN while preserving PLELog.
-
-    Rules:
-      1) Keep every original full sequence.
-      2) A Normal sequence can safely provide Normal prefixes.
-      3) For an Anomaly sequence, prefixes are used only when true event-level
-         labels reveal the first anomalous event:
-           before onset -> Normal
-           at/after onset -> Anomaly
-      4) If only a sequence-level Anomaly label exists, no early anomalous
-         prefix is fabricated. The original full anomalous sequence is kept.
-    """
-    augmented = list(original_train)
-
-    normal_prefixes = 0
-    anomaly_prefixes = 0
-    anomaly_sequences_with_onset = 0
-    anomaly_sequences_without_onset = 0
-    onset_label_sources = {}
-
-    for inst in tqdm(
-        original_train,
-        total=len(original_train),
-        desc="Build early-training prefixes",
-        unit="sequence",
-        dynamic_ncols=True,
-    ):
-        sequence = list(getattr(inst, "sequence", []))
-        T = len(sequence)
-
-        if T <= 1:
-            continue
-
-        # Full T is already present in `augmented`; add only shorter prefixes.
-        prefix_steps = sorted({
-            max(1, min(T - 1, int(round(T * float(ratio)))))
-            for ratio in prefix_ratios
-            if 0.0 < float(ratio) < 1.0
-        })
-
-        if not prefix_steps:
-            continue
-
-        if inst.label == "Normal":
-            for t in prefix_steps:
-                prefix_inst = copy.deepcopy(inst)
-                prefix_inst.sequence = sequence[:t]
-                prefix_inst.label = "Normal"
-                prefix_inst.early_prefix_step = int(t)
-                prefix_inst.early_prefix_ratio = float(t / T)
-                prefix_inst.early_training_source = "normal_sequence"
-                augmented.append(prefix_inst)
-                normal_prefixes += 1
-            continue
-
-        # Anomalous sequence: use early labels only if event-level onset exists.
-        event_flags, source_attr = _find_event_level_labels(inst)
-
-        if event_flags is None:
-            anomaly_sequences_without_onset += 1
-            continue
-
-        anomaly_positions = [
-            idx for idx, is_anomaly in enumerate(event_flags) if is_anomaly
-        ]
-
-        if not anomaly_positions:
-            anomaly_sequences_without_onset += 1
-            continue
-
-        first_anomaly_step = anomaly_positions[0] + 1  # 1-based
-        anomaly_sequences_with_onset += 1
-        onset_label_sources[source_attr] = onset_label_sources.get(source_attr, 0) + 1
-
-        for t in prefix_steps:
-            prefix_inst = copy.deepcopy(inst)
-            prefix_inst.sequence = sequence[:t]
-
-            if t < first_anomaly_step:
-                prefix_inst.label = "Normal"
-                normal_prefixes += 1
-            else:
-                prefix_inst.label = "Anomaly"
-                anomaly_prefixes += 1
-
-            prefix_inst.early_prefix_step = int(t)
-            prefix_inst.early_prefix_ratio = float(t / T)
-            prefix_inst.early_first_anomaly_step = int(first_anomaly_step)
-            prefix_inst.early_training_source = f"event_level:{source_attr}"
-
-            # Keep copied per-event metadata consistent with the shorter sequence.
-            try:
-                original_values = getattr(inst, source_attr)
-                setattr(prefix_inst, source_attr, list(original_values)[:t])
-            except Exception:
-                pass
-
-            augmented.append(prefix_inst)
-
-    random.shuffle(augmented)
-
-    print("\n" + "=" * 72)
-    print("EARLY-AWARE TRAINING AUGMENTATION")
-    print("=" * 72)
-    print(f"Original full training sequences : {len(original_train)}")
-    print(f"Added Normal prefixes            : {normal_prefixes}")
-    print(f"Added Anomaly prefixes           : {anomaly_prefixes}")
-    print(f"Anomaly seq. with onset metadata : {anomaly_sequences_with_onset}")
-    print(f"Anomaly seq. without onset data  : {anomaly_sequences_without_onset}")
-    print(f"Final training instances         : {len(augmented)}")
-    print(f"Training prefix ratios           : {prefix_ratios}")
-    if onset_label_sources:
-        print(f"Event-level label sources        : {onset_label_sources}")
-    else:
-        print(
-            "Event-level anomaly onset       : NOT FOUND -> "
-            "no fabricated anomalous prefixes"
-        )
-    print("=" * 72 + "\n")
-
-    return augmented
+# Approved protocol: original PLELog training only. No prefix augmentation.
+EARLY_TRAINING_ENABLED = False
 
 
 def compute_static_baseline_metrics(
@@ -499,16 +307,10 @@ def compute_sequential_baseline_metrics(
     delay_unit_cost=5.0,
 ):
     """
-    Metrics for prefix-based sequential inference using the SAME trained PLELog.
-
-    Sequence-level prediction:
-      - predicted anomaly if any prefix raises an anomaly alert
-      - predicted normal if no prefix raises an alert
-
-    Early-detection metrics are computed only for correctly detected anomalies.
-    EDR@25/50/75 = fraction of detected anomalies whose first alert occurs
-    within the first 25/50/75% of the sequence. This matches the interpretation
-    used for the RL early-detection comparison.
+    Compute sequence-level metrics from first-alert records generated by an
+    online detector. Inputs must already be produced causally; this function
+    does not execute model inference. EDR is initially conditional on successful
+    detections; the caller normalizes it by all anomalies for main reporting.
     """
     y_true = np.asarray(y_true).astype(int)
     y_pred = np.asarray(y_pred).astype(int)
@@ -591,7 +393,7 @@ def compute_sequential_baseline_metrics(
     average_cost_per_sequence = total_cost / max(1, len(y_true))
 
     return {
-        "evaluation_mode": "prefix_sequential",
+        "evaluation_mode": "online_first_alert_sequence_aggregation",
         "num_sequences": int(len(y_true)),
         "accuracy": float(accuracy),
         "balanced_accuracy": float(balanced_accuracy),
@@ -656,11 +458,11 @@ def format_sequential_baseline_metrics(metrics, model_name="PLELog SEQUENTIAL"):
 
     lines = []
     lines.append("#" * 80)
-    lines.append(f"{model_name}: PREFIX-BASED TEST METRICS")
+    lines.append(f"{model_name}: BOUNDED-WINDOW ONLINE TEST METRICS")
     lines.append("#" * 80)
     lines.append(
-        "During test, the trained model is applied to prefixes 1:t and "
-        "the first anomaly alert is used."
+        "At each event, the original model scores a bounded recent-event window. "
+        "Emitted event decisions cannot be revised."
     )
     lines.append(f"Number of sequences   : {metrics['num_sequences']}")
     lines.append("")
@@ -731,266 +533,162 @@ def format_sequential_baseline_metrics(metrics, model_name="PLELog SEQUENTIAL"):
     return "\n".join(lines)
 
 
-def evaluate_prefix_all_metrics(
-    plelog,
-    instances,
-    encoder,
-    scaler=None,
-    transformer=None,
-    threshold=0.5,
-    fp_unit_cost=10.0,
-    fn_unit_cost=20.0,
-    delay_unit_cost=5.0,
-    prefix_batch_size=32,
-    json_save_path=None,
-    txt_save_path=None,
-    model_name="PLELog SEQUENTIAL",
+# ================================================================
+# Approved online detection protocol: ORIGINAL training, bounded
+# history, one immutable *window-score decision* per incoming event.
+# PLELog remains a sequence/window classifier, not a native event classifier.
+# ================================================================
+def evaluate_online_bounded_window(
+    plelog, instances, encoder, scaler=None, transformer=None,
+    threshold=0.5, window_size=120, min_events=1,
+    sequence_csv=None, event_csv=None, json_path=None, txt_path=None,
 ):
-    """
-    Sequential prefix evaluation. The caller determines whether the model
-    was trained with original full sequences or with early-aware prefixes.
+    import csv
+    from collections import deque
 
-    For each test sequence of length T:
-        prefix 1
-        prefix 1:2
-        ...
-        prefix 1:t
-    are evaluated until the first anomaly prediction. If no prefix alerts,
-    the sequence is predicted normal.
-
-    Prefixes are evaluated in small batches for speed. Computing later prefixes
-    inside the same inference batch does not affect the first-alert decision;
-    the model has no online state update between prefixes.
-    """
-    y_true = []
-    y_pred = []
-    y_score = []
-    seq_lengths = []
-    detection_steps = []
-
+    if int(window_size) < 1 or not (1 <= int(min_events) <= int(window_size)):
+        raise ValueError("Invalid online window / minimum-event configuration")
+    if not sequence_csv or not event_csv or not json_path or not txt_path:
+        raise ValueError("Online evaluation requires all four output file paths")
+    os.makedirs(os.path.dirname(os.path.abspath(sequence_csv)), exist_ok=True)
+    y_true, y_pred, y_score, lengths, first_steps = [], [], [], [], []
+    emitted = 0
     plelog.model.eval()
 
-    seq_bar = tqdm(
-        instances,
-        total=len(instances),
-        desc="PLELog sequential prefix evaluation",
-        unit="sequence",
-        dynamic_ncols=True
-    )
+    with open(event_csv, "w", newline="", encoding="utf-8") as ef, \
+         open(sequence_csv, "w", newline="", encoding="utf-8") as sf:
+        ew = csv.writer(ef)
+        sw = csv.writer(sf)
+        ew.writerow(["sequence_id", "event_step", "memory_window_length",
+                     "anomaly_score", "emitted_decision", "status",
+                     "true_sequence_label_for_evaluation_only"])
+        sw.writerow(["sequence_id", "true_sequence_label", "predicted_sequence_label",
+                     "maximum_emitted_anomaly_score", "sequence_length", "first_alert_step",
+                     "window_size", "min_events", "protocol"])
 
-    with torch.no_grad():
-        for seq_idx, inst in enumerate(seq_bar):
-            sequence = list(inst.sequence)
-            T = len(sequence)
+        with torch.no_grad():
+            for seq_id, inst in enumerate(tqdm(instances, total=len(instances),
+                                               desc="PLELog ONLINE event streaming",
+                                               unit="sequence", dynamic_ncols=True)):
+                original_sequence = list(inst.sequence)
+                T = len(original_sequence)
+                truth = 0 if inst.label == "Normal" else 1
+                memory = deque(maxlen=int(window_size))
+                first_alert = None
+                max_anomaly_score = None
 
-            true_binary = 0 if inst.label == "Normal" else 1
-            first_alert_step = None
-            max_score_seen = 0.0
+                for t, new_event in enumerate(original_sequence, 1):
+                    # Only the newly arriving event enters memory. Oldest data
+                    # is evicted automatically at window_size; no growing prefix.
+                    memory.append(new_event)
+                    if t < min_events:
+                        ew.writerow([seq_id, t, len(memory), "", "", "warmup", truth])
+                        continue
 
-            if T > 0:
-                for start_t in range(1, T + 1, prefix_batch_size):
-                    end_t = min(T, start_t + prefix_batch_size - 1)
+                    # This classifier requires a sequence-shaped feature vector;
+                    # calculate it from the *bounded* currently retained window.
+                    # It cannot re-evaluate data already evicted from memory.
+                    observation = copy.copy(inst)
+                    observation.sequence = list(memory)
+                    observation.label = "Normal"  # Placeholder. Test truth not used to score.
+                    # Never reuse a full-sequence representation from preprocessing.
+                    observation.repr = None
+                    for attr in ("event_labels", "sequence_labels", "line_labels",
+                                 "anomaly_flags", "event_anomalies", "token_labels"):
+                        if hasattr(observation, attr):
+                            setattr(observation, attr, None)
+                    try:
+                        features = np.asarray(encoder.present([observation]))
+                        if scaler is not None:
+                            features = scaler.transform(features)
+                            features = np.nan_to_num(features, nan=0., posinf=1e6, neginf=-1e6)
+                        if transformer is not None:
+                            features = transformer.transform(features)
+                        observation.repr = features[0]
+                        tinst = generate_tinsts_binary_label(
+                            [observation], plelog.vocab, False)
+                        tinst.to_device(device)
+                        prediction, probabilities = plelog.predict(tinst.inputs, threshold)
+                        probability = float(probabilities.detach().cpu().numpy()[0, plelog.anomaly_id])
+                        decision = int(int(np.asarray(prediction).reshape(-1)[0]) == plelog.anomaly_id)
+                    except Exception as exc:
+                        # Fail rather than silently substituting a normal result.
+                        raise RuntimeError(
+                            f"PLELog online scoring failed at sequence={seq_id}, event={t}, "
+                            f"memory_len={len(memory)}. Cannot produce a fair online score."
+                        ) from exc
 
-                    prefix_instances = []
-                    prefix_steps = []
+                    ew.writerow([seq_id, t, len(memory), probability, decision, "scored", truth])
+                    emitted += 1
+                    max_anomaly_score = (probability if max_anomaly_score is None
+                                         else max(max_anomaly_score, probability))
+                    if decision == 1 and first_alert is None:
+                        first_alert = t
+                    # Do not stop after an alert. Each event gets a final decision.
+                    # Do not revise old decisions or re-evaluate the full history.
 
-                    for t in range(start_t, end_t + 1):
-                        prefix_inst = copy.deepcopy(inst)
-                        prefix_inst.sequence = sequence[:t]
-                        prefix_instances.append(prefix_inst)
-                        prefix_steps.append(t)
+                # A sequence-level anomaly is reported if at least one online
+                # alert was emitted. This is an evaluation mapping, NOT a
+                # retrospectively revised or merged event-level decision.
+                sequence_decision = int(first_alert is not None)
+                y_true.append(truth)
+                y_pred.append(sequence_decision)
+                y_score.append(0.0 if max_anomaly_score is None else max_anomaly_score)
+                lengths.append(max(1, T))
+                first_steps.append(first_alert)
+                sw.writerow([seq_id, truth, sequence_decision,
+                             max_anomaly_score if max_anomaly_score is not None else "",
+                             T, first_alert if first_alert is not None else "",
+                             window_size, min_events, "bounded_online"])
 
-                    # Recompute representation from only the currently
-                    # observed prefix. No future events enter this representation.
-                    prefix_presented = encoder.present(prefix_instances)
-                    prefix_reprs = np.asarray(prefix_presented)
-
-                    # Reuse preprocessing fitted on TRAIN only.
-                    if scaler is not None:
-                        prefix_reprs = scaler.transform(prefix_reprs)
-                        prefix_reprs = np.nan_to_num(
-                            prefix_reprs,
-                            nan=0.0,
-                            posinf=1e6,
-                            neginf=-1e6
-                        )
-
-                    if transformer is not None:
-                        prefix_reprs = transformer.transform(prefix_reprs)
-
-                    for pinst, vec in zip(prefix_instances, prefix_reprs):
-                        pinst.repr = vec
-
-                    tinst = generate_tinsts_binary_label(
-                        prefix_instances,
-                        plelog.vocab,
-                        False
-                    )
-                    tinst.to_device(device)
-
-                    pred_tags, tag_logits = plelog.predict(
-                        tinst.inputs,
-                        threshold
-                    )
-
-                    probs = tag_logits.detach().cpu().numpy()
-                    anomaly_probs = probs[:, plelog.anomaly_id]
-                    pred_tags = np.asarray(pred_tags).astype(int)
-
-                    # Find the first alert in chronological order.
-                    for local_idx, t in enumerate(prefix_steps):
-                        prob = float(anomaly_probs[local_idx])
-                        max_score_seen = max(max_score_seen, prob)
-
-                        if pred_tags[local_idx] == plelog.anomaly_id:
-                            first_alert_step = int(t)
-                            break
-
-                    seq_bar.set_postfix(
-                        current=f"{min(end_t, T)}/{T}",
-                        label=inst.label,
-                        alert=(
-                            "-" if first_alert_step is None
-                            else first_alert_step
-                        )
-                    )
-
-                    if first_alert_step is not None:
-                        break
-
-            pred_binary = 1 if first_alert_step is not None else 0
-
-            y_true.append(true_binary)
-            y_pred.append(pred_binary)
-            y_score.append(float(max_score_seen))
-            seq_lengths.append(max(1, T))
-            detection_steps.append(first_alert_step)
-
+    # Sequence-level classification and time of first emitted alarm.
     metrics = compute_sequential_baseline_metrics(
-        y_true=y_true,
-        y_pred=y_pred,
-        y_score=y_score,
-        seq_lengths=seq_lengths,
-        detection_steps=detection_steps,
-        fp_unit_cost=fp_unit_cost,
-        fn_unit_cost=fn_unit_cost,
-        delay_unit_cost=delay_unit_cost,
+        y_true=y_true, y_pred=y_pred, y_score=y_score, seq_lengths=lengths,
+        detection_steps=first_steps, fp_unit_cost=10.0,
+        fn_unit_cost=20.0, delay_unit_cost=5.0,
+    )
+    # Existing helper gives conditional EDR. Convert to timely coverage:
+    # numerator = correct anomalous sequences detected by q; denominator =
+    # ALL anomalous sequences. Preserve conditional values for audit only.
+    metrics["edr_conditional_25"] = metrics["edr_25"]
+    metrics["edr_conditional_50"] = metrics["edr_50"]
+    metrics["edr_conditional_75"] = metrics["edr_75"]
+    for q, key in ((.25, "edr_25"), (.50, "edr_50"), (.75, "edr_75")):
+        total_anomaly_count = sum(int(yy == 1) for yy in y_true)
+        count = sum(int(yy == 1 and pp == 1 and step is not None and
+                        step / float(length) <= q)
+                    for yy, pp, step, length in zip(y_true, y_pred, first_steps, lengths))
+        metrics[key] = count / total_anomaly_count if total_anomaly_count else 0.0
+
+    metrics["evaluation_mode"] = "online_bounded_window"
+    metrics["online_window_size"] = int(window_size)
+    metrics["online_min_events"] = int(min_events)
+    metrics["event_decisions_emitted"] = int(emitted)
+    metrics["edr_denominator"] = "all anomalous test sequences"
+    metrics["sequence_aggregation"] = "any emitted anomaly alert; event decisions never revised"
+    metrics["online_learning"] = False
+    metrics["training_augmentation"] = False
+    metrics["classification_unit"] = "sequence (event predictions are separately saved)"
+    metrics["classification_report_text"] = classification_report(
+        y_true, y_pred, labels=[0, 1], target_names=["Normal (0)", "Anomaly (1)"],
+        digits=4, zero_division=0,
     )
 
-    class_report_text = classification_report(
-        y_true,
-        y_pred,
-        labels=[0, 1],
-        target_names=["Normal (0)", "Anomaly (1)"],
-        digits=4,
-        zero_division=0
-    )
-    metrics["classification_report_text"] = class_report_text
-
-    report_text = format_sequential_baseline_metrics(
-        metrics,
-        model_name=model_name
-    )
-
-    print()
-    print(report_text)
-
-    if json_save_path is not None:
-        os.makedirs(os.path.dirname(json_save_path), exist_ok=True)
-        with open(json_save_path, "w", encoding="utf-8") as f:
-            json.dump(metrics, f, indent=2)
-        print(f"Saved sequential JSON metrics to: {json_save_path}")
-
-    if txt_save_path is not None:
-        os.makedirs(os.path.dirname(txt_save_path), exist_ok=True)
-        with open(txt_save_path, "w", encoding="utf-8") as f:
-            f.write(report_text)
-            f.write("\n")
-        print(f"Saved sequential text metrics to: {txt_save_path}")
-
-    return metrics
-
-
-def save_standard_vs_sequential_comparison(
-    standard_metrics,
-    sequential_metrics,
-    json_path,
-    txt_path,
-):
-    """Save one comparison report for the same DEV-selected checkpoint."""
-    comparison = {
-        "checkpoint_selection": "best checkpoint selected using DEV F1",
-        "standard_full_sequence": standard_metrics,
-        "sequential_prefix_inference": sequential_metrics,
-    }
-
-    os.makedirs(os.path.dirname(json_path), exist_ok=True)
+    report = format_sequential_baseline_metrics(metrics, model_name="PLELog ONLINE")
+    report += ("\nEDR definition: fraction of ALL anomalous test sequences "
+               "alerted before each sequence fraction.\n"
+               "Online model input: bounded most-recent-event window, no prefix augmentation.\n"
+               "The event decisions CSV contains immutable online outputs.\n"
+               "Event-level evaluation requires EVENT-level ground truth.\n")
+    print("\n" + report)
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(comparison, f, indent=2)
-
-    keys = [
-        ("accuracy", "Accuracy"),
-        ("balanced_accuracy", "Balanced Accuracy"),
-        ("precision", "Precision"),
-        ("recall", "Recall"),
-        ("specificity_tnr", "Specificity"),
-        ("f1_score", "F1"),
-        ("f2_score", "F2"),
-        ("fpr", "FPR"),
-        ("fnr", "FNR"),
-        ("mcc", "MCC"),
-        ("auroc", "AUROC"),
-        ("auprc", "AUPRC"),
-        ("anomaly_detection_coverage", "Detection Coverage"),
-        ("average_detection_step", "Avg Detection Step"),
-        ("average_detection_ratio", "Avg Detection Ratio"),
-        ("median_detection_ratio", "Median Detection Ratio"),
-        ("edr_25", "EDR@25"),
-        ("edr_50", "EDR@50"),
-        ("edr_75", "EDR@75"),
-        ("alert_rate", "Alert Rate"),
-        ("false_positive_total_cost", "False-positive Cost"),
-        ("false_negative_total_cost", "False-negative Cost"),
-        ("delay_total_cost", "Delay Cost"),
-        ("total_cost", "Total Cost"),
-        ("average_cost_per_sequence", "Avg Cost / Sequence"),
-    ]
-
-    def fmt(v):
-        if v is None:
-            return "N/A"
-        if isinstance(v, (int, np.integer)):
-            return str(int(v))
-        return f"{float(v):.6f}"
-
-    lines = []
-    lines.append("=" * 92)
-    lines.append("PLELog-Early BEST CHECKPOINT: FULL-SEQUENCE vs SEQUENTIAL PREFIX INFERENCE")
-    lines.append("Checkpoint selected using DEV F1; the same PLELog-Early checkpoint is used for both evaluations.")
-    lines.append("=" * 92)
-    lines.append(
-        f"{'Metric':<28} | {'Standard':>20} | {'Sequential':>20}"
-    )
-    lines.append("-" * 92)
-
-    for key, label in keys:
-        lines.append(
-            f"{label:<28} | "
-            f"{fmt(standard_metrics.get(key)):>20} | "
-            f"{fmt(sequential_metrics.get(key)):>20}"
-        )
-
-    lines.append("=" * 92)
-    report = "\n".join(lines)
-
+        json.dump(metrics, f, indent=2)
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write(report)
-        f.write("\n")
-
-    print()
-    print(report)
-    print(f"Saved comparison JSON to: {json_path}")
-    print(f"Saved comparison TXT to: {txt_path}")
+    print("Saved ONLINE metrics:", os.path.abspath(json_path))
+    print("Saved ONLINE sequence predictions:", os.path.abspath(sequence_csv))
+    print("Saved ONLINE event decisions:", os.path.abspath(event_csv))
+    return metrics
 
 
 class PLELog:
@@ -1144,6 +842,7 @@ class PLELog:
         delay_unit_cost=5.0,
         json_save_path=None,
         txt_save_path=None,
+        csv_save_path=None,
         model_name="PLELog",
     ):
         """
@@ -1186,6 +885,21 @@ class PLELog:
                         seq_lengths.append(len(inst.sequence))
                     else:
                         seq_lengths.append(1)
+
+        if csv_save_path is not None:
+            import csv
+            os.makedirs(os.path.dirname(os.path.abspath(csv_save_path)), exist_ok=True)
+            with open(csv_save_path, "w", encoding="utf-8", newline="") as stream:
+                writer = csv.writer(stream)
+                writer.writerow(["sequence_id", "true_sequence_label", "predicted_sequence_label",
+                                 "anomaly_score", "sequence_length", "first_alert_step",
+                                 "decision_protocol"])
+                for i, (truth, pred, score, length) in enumerate(
+                    zip(y_true, y_pred, y_score, seq_lengths)
+                ):
+                    writer.writerow([i, truth, pred, score, length,
+                                     int(length) if pred else "", "full_sequence"])
+            print("Saved Standard sequence-level predictions:", csv_save_path)
 
         metrics = compute_static_baseline_metrics(
             y_true=y_true,
@@ -1335,7 +1049,7 @@ if __name__ == '__main__':
 
     # ---------------- Arguments ----------------
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--dataset', default='HDFS', type=str)  # BGL, HDFS, TH_1G, SP_150MB
+    argparser.add_argument('--dataset', default='SP_150MB_ratio', type=str)  # BGL, HDFS, TH_1G, SP_150MB
     argparser.add_argument('--mode', default='train', type=str)
     argparser.add_argument('--parser', default='IBM', type=str)
     argparser.add_argument('--min_cluster_size', type=int, default=100)
@@ -1347,13 +1061,17 @@ if __name__ == '__main__':
         '--variant',
         default='both',
         type=str,
-        choices=['standard', 'early', 'both'],
+        choices=['standard', 'online', 'both'],
         help=(
             "standard = original PLELog training + full-sequence test; "
-            "early = prefix-aware training + sequential prefix test; "
-            "both = run both independently and print one comparison table"
+            "online = same original training + bounded-window streaming inference; "
+            "both = train once and evaluate Standard followed by Online"
         )
     )
+    argparser.add_argument('--online_window', default=120, type=int,
+                           help='Maximum recent log events retained in memory for online inference')
+    argparser.add_argument('--online_min_events', default=1, type=int,
+                           help='Explicit warm-up before first online decision (default 1)')
     argparser.add_argument(
         '--data_root',
         default='../../LWADLS/datasets',
@@ -1371,6 +1089,10 @@ if __name__ == '__main__':
     threshold = args.threshold
     case = args.case
     data_root = args.data_root
+    online_window = max(1, int(args.online_window))
+    online_min_events = max(1, int(args.online_min_events))
+    if online_min_events > online_window:
+        raise ValueError("--online_min_events must not exceed --online_window")
     variant = args.variant
 
     # ---------------- Paths ----------------
@@ -1423,12 +1145,9 @@ if __name__ == '__main__':
     # datasets/TH_1G/PLELog_results/TH_1G_IBM/
     results_root = os.path.join(DATASETS_ROOT, dataset, "PLELog_results")
 
-    if variant == "standard":
-        save_dir = os.path.join(results_root, "PLELog_Standard")
-    elif variant == "early":
-        save_dir = os.path.join(results_root, "PLELog_Early")
-    else:
-        save_dir = os.path.join(results_root, "comparison")
+    # All modes use the same unmodified full-sequence PLELog training protocol.
+    # The both mode trains once and runs both evaluations from ONE checkpoint.
+    save_dir = os.path.join(results_root, "PLELog_OriginalTrain_OnlineComparison")
 
     exp_dir = os.path.join(save_dir, f"{dataset}_{parser}")
 
@@ -1453,129 +1172,8 @@ if __name__ == '__main__':
     print("Metrics TXT will be saved in:", os.path.abspath(os.path.join(DATASETS_ROOT, dataset)))
     print("==============================\n")
 
-    # ============================================================
-    # BOTH mode = two independent experiments
-    # ============================================================
-    if variant == "both":
-        print("\n" + "=" * 92)
-        print("PLELog comparison: STANDARD vs EARLY")
-        print("Each method is trained independently in its own output directory.")
-        print("=" * 92)
-
-        common_cmd = [
-            sys.executable,
-            os.path.abspath(__file__),
-            "--dataset", str(dataset),
-            "--mode", str(mode),
-            "--parser", str(parser),
-            "--min_cluster_size", str(min_cluster_size),
-            "--min_samples", str(min_samples),
-            "--reduce_dimension", str(reduce_dimension),
-            "--threshold", str(threshold),
-            "--case", str(case),
-            "--data_root", str(data_root),
-        ]
-
-        print("\n[1/2] Running PLELog-Standard ...")
-        subprocess.run(common_cmd + ["--variant", "standard"], check=True)
-
-        print("\n[2/2] Running PLELog-Early ...")
-        subprocess.run(common_cmd + ["--variant", "early"], check=True)
-
-        standard_json = os.path.join(
-            results_root,
-            "PLELog_Standard",
-            f"{dataset}_{parser}",
-            "PLELog_Standard_metrics.json",
-        )
-        early_json = os.path.join(
-            results_root,
-            "PLELog_Early",
-            f"{dataset}_{parser}",
-            "PLELog_Early_metrics.json",
-        )
-
-        with open(standard_json, "r", encoding="utf-8") as f:
-            standard_metrics = json.load(f)
-        with open(early_json, "r", encoding="utf-8") as f:
-            early_metrics = json.load(f)
-
-        comparison_dir = os.path.join(results_root, "comparison")
-        os.makedirs(comparison_dir, exist_ok=True)
-
-        comparison_json = os.path.join(
-            comparison_dir,
-            f"{dataset}_{parser}_PLELog_Standard_vs_Early.json"
-        )
-        comparison_txt = os.path.join(
-            comparison_dir,
-            f"{dataset}_{parser}_PLELog_Standard_vs_Early.txt"
-        )
-
-        comparison = {
-            "PLELog-Standard": standard_metrics,
-            "PLELog-Early": early_metrics,
-        }
-        with open(comparison_json, "w", encoding="utf-8") as f:
-            json.dump(comparison, f, indent=2)
-
-        columns = [
-            ("accuracy", "Accuracy"),
-            ("precision", "Precision"),
-            ("recall", "Recall"),
-            ("f1_score", "F1"),
-            ("mcc", "MCC"),
-            ("auroc", "AUROC"),
-            ("auprc", "AUPRC"),
-            ("anomaly_detection_coverage", "Detection Coverage"),
-            ("average_detection_ratio", "Avg Det. Ratio"),
-            ("edr_25", "EDR@25"),
-            ("edr_50", "EDR@50"),
-            ("edr_75", "EDR@75"),
-            ("false_positive_total_cost", "False-positive Cost"),
-            ("false_negative_total_cost", "False-negative Cost"),
-            ("delay_total_cost", "Delay Cost"),
-            ("total_cost", "Total Cost"),
-        ]
-
-        def _fmt_metric(v):
-            if v is None:
-                return "N/A"
-            if isinstance(v, int):
-                return str(v)
-            return f"{float(v):.4f}"
-
-        rows = [
-            ("PLELog-Standard", standard_metrics),
-            ("PLELog-Early", early_metrics),
-        ]
-
-        lines = []
-        lines.append("=" * 72)
-        lines.append("FINAL RESULTS: PLELog-Standard vs PLELog-Early")
-        lines.append("=" * 72)
-        lines.append(f"{'Metric':<28} | {'PLELog-Standard':>18} | {'PLELog-Early':>18}")
-        lines.append("-" * 72)
-        for key, label in columns:
-            lines.append(
-                f"{label:<28} | "
-                f"{_fmt_metric(standard_metrics.get(key)):>18} | "
-                f"{_fmt_metric(early_metrics.get(key)):>18}"
-            )
-        lines.append("=" * 72)
-        table_text = "\n".join(lines)
-
-        with open(comparison_txt, "w", encoding="utf-8") as f:
-            f.write(table_text + "\n")
-
-        print("\n" + table_text)
-        print(f"\nSaved comparison JSON: {comparison_json}")
-        print(f"Saved comparison TXT : {comparison_txt}")
-        print("\nAll Finished ✅")
-        sys.exit(0)
-
-    # For child runs, choose the training protocol explicitly.
-    EARLY_TRAINING_ENABLED = (variant == "early")
+    # No independent Early retraining; original PLELog training is shared.
+    EARLY_TRAINING_ENABLED = False
 
     # ---------------- Load PKL ----------------
     # first paper :
@@ -1753,6 +1351,16 @@ if __name__ == '__main__':
     # ============================================================
 
     random.seed(RANDOM_SEED)
+    np.random.seed(RANDOM_SEED)
+    torch.manual_seed(RANDOM_SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(RANDOM_SEED)
+
+    if CASE != "in_domain":
+        raise NotImplementedError(
+            "This verified Standard/Online revision currently supports in_domain only. "
+            "The uploaded cross_dataset branch references undefined source settings."
+        )
 
     processor = PKLPreprocessor()
 
@@ -1788,17 +1396,8 @@ if __name__ == '__main__':
 
         print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
 
-        # ------------------------------------------------------------
-        # NEW: minimal early-aware TRAINING only
-        # ------------------------------------------------------------
-        if EARLY_TRAINING_ENABLED:
-            print("[EARLY-TRAIN] Adding safe prefix samples to TRAIN only ...")
-            train = build_early_training_instances(
-                original_train=train,
-                prefix_ratios=TRAIN_PREFIX_RATIOS,
-            )
-        else:
-            print("[EARLY-TRAIN] Disabled; original full-sequence training is used.")
+        # Original training, identical for Standard and Online inference.
+        print("[TRAIN] Original PLELog training; no prefix augmentation.")
 
         print("[2/6] Building event IDs and sequence representations ...")
         print("      Progress bars below will show exact sequence counts where available.")
@@ -1973,11 +1572,6 @@ if __name__ == '__main__':
     print("Ready for training")
     print("==============================")
     print(f"Loaded {len(train)} train / {len(dev)} dev / {len(test)} test")
-    if CASE == "in_domain" and EARLY_TRAINING_ENABLED:
-        print(
-            "Training protocol: original PLELog components + "
-            "safe prefix-aware training augmentation"
-        )
     #======================================================++++++++++++++++++++++++++++++++++++++++
 
 
@@ -1990,19 +1584,29 @@ if __name__ == '__main__':
 
     print("\n[2/6] Embeddings / event-ID preparation")
     # ---------------- Embeddings ----------------
+    # Training-derived representation vocabulary only. Never inspect dev/test
+    # event IDs to build the model vocabulary or embedding parameters.
+    # Every previously unseen event receives the SAME fixed OOV vector at runtime.
     all_event_ids = set()
-    all_instances_for_vocab = train + dev + test
-    for inst in tqdm(
-        all_instances_for_vocab,
-        total=len(all_instances_for_vocab),
-        desc="Collecting event IDs",
-        unit="sequence",
-        dynamic_ncols=True
-    ):
+    for inst in tqdm(train, total=len(train), desc="Collect training event IDs", unit="sequence"):
         all_event_ids.update(inst.sequence)
 
     embedding_dim = 50
-    processor.embedding = {eid: np.random.rand(embedding_dim) for eid in all_event_ids}
+    unknown_vector = np.zeros(embedding_dim, dtype=float)
+
+    class FixedOOVEmbeddings(dict):
+        def __missing__(self, key):
+            return unknown_vector
+        def get(self, key, default=None):
+            return dict.get(self, key, unknown_vector)
+
+    processor.embedding = FixedOOVEmbeddings({
+        eid: np.random.rand(embedding_dim) for eid in sorted(all_event_ids, key=str)
+    })
+    print("Training-only event vocabulary:", len(processor.embedding),
+          "| unseen event embeddings map to one fixed zero OOV vector")
+    # NOTE: external Sequential_TF and Vocab must support unknown event IDs.
+    # If not, fail visibly; never read test data in advance to build vocabulary.
 
     # ---------------- Sequence representation ----------------
     encoder = Sequential_TF(processor.embedding)
@@ -2029,21 +1633,27 @@ if __name__ == '__main__':
     ):
         inst.repr = vec
 
-    with blocking_stage("Compute test representations"):
-        test_presented = encoder.present(test)
-    for inst, vec in tqdm(
-        zip(test, test_presented),
-        total=len(test),
-        desc="Assign test representations",
-        unit="sequence",
-        dynamic_ncols=True
-    ):
-        inst.repr = vec
+    if variant in ("standard", "both"):
+        # Full sequence is needed for the Standard reference only.
+        with blocking_stage("Compute Standard test representations"):
+            test_presented = encoder.present(test)
+        for inst, vec in tqdm(
+            zip(test, test_presented),
+            total=len(test),
+            desc="Assign Standard test representations",
+            unit="sequence",
+            dynamic_ncols=True
+        ):
+            inst.repr = vec
+    else:
+        # Online-only mode must not materialize complete test representations.
+        test_presented = None
     print("\n[3/6] Representation scaling / FastICA")
     # ---------------- Dimension Reduction (FastICA) ----------------
     train_reprs = np.array([inst.repr for inst in train])
     dev_reprs = np.array([inst.repr for inst in dev])  # <-- Added
-    test_reprs = np.array([inst.repr for inst in test])
+    test_reprs = (np.array([inst.repr for inst in test])
+                  if variant in ("standard", "both") else None)
 
     scaler = None
     transformer = None
@@ -2088,18 +1698,20 @@ if __name__ == '__main__':
         ):
             inst.repr = dev_reprs[idx]
 
-        # Transform test set
-        with blocking_stage("Transform test with scaler + ICA"):
-            test_reprs = scaler.transform(test_reprs)
-            test_reprs = transformer.transform(test_reprs)
-        for idx, inst in tqdm(
-            enumerate(test),
-            total=len(test),
-            desc="Store ICA test vectors",
-            unit="sequence",
-            dynamic_ncols=True
-        ):
-            inst.repr = test_reprs[idx]
+        # Transform full test sequences for Standard reference only.
+        # Online mode constructs each current-window representation on arrival.
+        if test_reprs is not None:
+            with blocking_stage("Transform Standard test with scaler + ICA"):
+                test_reprs = scaler.transform(test_reprs)
+                test_reprs = transformer.transform(test_reprs)
+            for idx, inst in tqdm(
+                enumerate(test),
+                total=len(test),
+                desc="Store ICA Standard test vectors",
+                unit="sequence",
+                dynamic_ncols=True
+            ):
+                inst.repr = test_reprs[idx]
 
         print(f"Finished FastICA in {time.time() - start_time:.2f} seconds")
 
@@ -2141,6 +1753,9 @@ if __name__ == '__main__':
     with blocking_stage("PLELog probabilistic labeling"):
         labeled_train = label_generator.auto_label(train, normal_ids)
 
+    # Approved protocol: no prefix augmentation after probabilistic labeling.
+    # Full-sequence PLELog training data and objective are unchanged.
+
     # ---------------- Model ----------------
     vocab = Vocab()
     vocab.load_from_dict(processor.embedding)
@@ -2152,12 +1767,12 @@ if __name__ == '__main__':
     best_model_file = os.path.join(output_model_dir, 'best.pt')
     last_model_file = os.path.join(output_model_dir, 'last.pt')
 
-    print(f"\n[5/6] Model training: {'PLELog-Early' if variant == 'early' else 'PLELog-Standard'}")
+    print("\n[5/6] Original PLELog training (shared by both evaluation modes)")
     # ========================= TRAIN =========================
     Estimated_training_time = 0.0
     if mode == 'train':
         optimizer = Optimizer(filter(lambda p: p.requires_grad, plelog.model.parameters()))
-        bestF = 0.0
+        bestF = float("-inf")  # Save a checkpoint even if all dev F1 values are zero
         start_train = time.time()
 
         num_train_batches = max(1, (len(labeled_train) + batch_size - 1) // batch_size)
@@ -2219,108 +1834,74 @@ if __name__ == '__main__':
         Estimated_training_time = train_time
         print(f"\nTotal training time: {Estimated_training_time:.2f} minutes")
 
-    print("\n[6/6] Final test evaluation")
-    # ========================= TEST =========================
+    print("\n[6/6] Final test evaluations (one DEV-selected checkpoint)")
     if not os.path.exists(best_model_file):
-        raise RuntimeError(
-            "DEV-selected best.pt was not found. Train first or check: "
-            + os.path.abspath(output_model_dir)
-        )
+        raise RuntimeError("DEV-selected best.pt missing: " + os.path.abspath(best_model_file))
+    plelog.model.load_state_dict(torch.load(best_model_file, map_location=device))
+    plelog.model.eval()
 
-    plelog.model.load_state_dict(
-        torch.load(best_model_file, map_location=device)
-    )
-
-    if variant == "standard":
-        # -----------------------------------------------------
-        # PLELog-STANDARD
-        # Original full-sequence training + full-sequence test.
-        # -----------------------------------------------------
-        method_name = "PLELog-Standard"
+    comparison = {}
+    report_rows = []
+    if variant in ("standard", "both"):
+        print("\n[STANDARD] Full-sequence inference")
         start = time.time()
-        final_metrics = plelog.evaluate_all_metrics(
-            instances=test,
-            threshold=threshold,
-            fp_unit_cost=10.0,
-            fn_unit_cost=20.0,
-            delay_unit_cost=5.0,
-            json_save_path=os.path.join(
-                exp_dir,
-                "PLELog_Standard_metrics.json"
-            ),
-            txt_save_path=os.path.join(
-                exp_dir,
-                "PLELog_Standard_metrics.txt"
-            ),
-            model_name=method_name,
+        m = plelog.evaluate_all_metrics(
+            instances=test, threshold=threshold,
+            fp_unit_cost=10.0, fn_unit_cost=20.0, delay_unit_cost=5.0,
+            json_save_path=os.path.join(exp_dir, "PLELog_Standard_metrics.json"),
+            txt_save_path=os.path.join(exp_dir, "PLELog_Standard_metrics.txt"),
+            csv_save_path=os.path.join(exp_dir, "PLELog_Standard_predictions.csv"),
+            model_name="PLELog-Standard",
         )
-        evaluation_time = (time.time() - start) / 60.0
+        m["protocol"] = "Full-sequence original PLELog"
+        m["evaluation_time_min"] = (time.time() - start) / 60.0
+        comparison["PLELog-Standard"] = m
+        report_rows.append(("Standard", m))
 
-    elif variant == "early":
-        # -----------------------------------------------------
-        # PLELog-EARLY
-        # Prefix-aware training + sequential prefix test.
-        # -----------------------------------------------------
-        method_name = "PLELog-Early"
+    if variant in ("online", "both"):
+        print("\n[ONLINE] Bounded-window sequential event decisions")
         start = time.time()
-        final_metrics = evaluate_prefix_all_metrics(
-            plelog=plelog,
-            instances=test,
-            encoder=encoder,
-            scaler=scaler,
-            transformer=transformer,
-            threshold=threshold,
-            fp_unit_cost=10.0,
-            fn_unit_cost=20.0,
-            delay_unit_cost=5.0,
-            prefix_batch_size=32,
-            json_save_path=os.path.join(
-                exp_dir,
-                "PLELog_Early_metrics.json"
-            ),
-            txt_save_path=os.path.join(
-                exp_dir,
-                "PLELog_Early_metrics.txt"
-            ),
-            model_name=method_name,
+        m = evaluate_online_bounded_window(
+            plelog=plelog, instances=test, encoder=encoder,
+            scaler=scaler, transformer=transformer,
+            threshold=threshold, window_size=online_window,
+            min_events=online_min_events,
+            sequence_csv=os.path.join(exp_dir, "PLELog_Online_predictions.csv"),
+            event_csv=os.path.join(exp_dir, "PLELog_Online_event_decisions.csv"),
+            json_path=os.path.join(exp_dir, "PLELog_Online_metrics.json"),
+            txt_path=os.path.join(exp_dir, "PLELog_Online_metrics.txt"),
         )
-        evaluation_time = (time.time() - start) / 60.0
+        m["evaluation_time_min"] = (time.time() - start) / 60.0
+        comparison["PLELog-Online"] = m
+        report_rows.append(("Online", m))
 
-    else:
-        raise ValueError(f"Unexpected child variant: {variant}")
-
-    print("\n" + "=" * 80)
-    print(f"FINAL RESULT: {method_name}")
-    print("=" * 80)
-    print(f"Precision          : {final_metrics['precision']:.4f}")
-    print(f"Recall             : {final_metrics['recall']:.4f}")
-    print(f"F1                 : {final_metrics['f1_score']:.4f}")
-    print(
-        f"Detection Coverage : "
-        f"{final_metrics['anomaly_detection_coverage']:.4f}"
-    )
-    print(
-        "Avg Det. Ratio     : "
-        + (
-            "N/A"
-            if final_metrics['average_detection_ratio'] is None
-            else f"{final_metrics['average_detection_ratio']:.4f}"
-        )
-    )
-    print(f"EDR@25             : {final_metrics['edr_25']:.4f}")
-    print(f"EDR@50             : {final_metrics['edr_50']:.4f}")
-    print(f"EDR@75             : {final_metrics['edr_75']:.4f}")
-    print(
-        f"False-positive Cost: "
-        f"{final_metrics['false_positive_total_cost']:.4f}"
-    )
-    print(
-        f"False-negative Cost: "
-        f"{final_metrics['false_negative_total_cost']:.4f}"
-    )
-    print(f"Delay Cost         : {final_metrics['delay_total_cost']:.4f}")
-    print(f"Total Cost         : {final_metrics['total_cost']:.4f}")
-    print(f"Evaluation Time    : {evaluation_time:.4f} min")
-    print(f"Training Time      : {Estimated_training_time:.4f} min")
-    print("=" * 80)
-    print("All Finished ✅")
+    def fmt(value):
+        return "N/A" if value is None else f"{float(value):.6f}"
+    keys = [
+        ("precision", "Precision"), ("recall", "Recall"),
+        ("f1_score", "F1"), ("fpr", "FPR"),
+        ("average_detection_ratio", "AvgRatio"),
+        ("edr_25", "EDR@25"), ("edr_50", "EDR@50"),
+        ("edr_75", "EDR@75"),
+        ("false_positive_total_cost", "FP Cost"),
+        ("false_negative_total_cost", "FN Cost"),
+        ("delay_total_cost", "Delay Cost"),
+        ("total_cost", "Total Cost"),
+    ]
+    lines = ["=" * 76, f"PLELog {dataset} - ORIGINAL TRAINING, STANDARD vs ONLINE",
+             "=" * 76, f"{'Metric':<23} {'Standard':>23} {'Online':>23}", "-" * 76]
+    for key, name in keys:
+        lines.append(f"{name:<23} " +
+                     f"{fmt(comparison['PLELog-Standard'].get(key)) if 'PLELog-Standard' in comparison else 'N/A':>23} " +
+                     f"{fmt(comparison['PLELog-Online'].get(key)) if 'PLELog-Online' in comparison else 'N/A':>23}")
+    lines += ["=" * 76, "Training time (minutes): " + fmt(Estimated_training_time),
+              "Model: " + os.path.abspath(best_model_file),
+              "Results: " + os.path.abspath(exp_dir)]
+    table = "\n".join(lines)
+    print("\n" + table)
+    with open(os.path.join(exp_dir, "PLELog_Standard_vs_Online.txt"), "w", encoding="utf-8") as f:
+        f.write(table + "\n")
+    with open(os.path.join(exp_dir, "PLELog_Standard_vs_Online.json"), "w", encoding="utf-8") as f:
+        json.dump(comparison, f, indent=2)
+    print("\nFinished. Note: online sequence scores aggregate irreversible window-alert decisions;")
+    print("event-level correctness needs event-level ground truth, not sequence labels.")
