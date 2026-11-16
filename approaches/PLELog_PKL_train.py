@@ -173,7 +173,8 @@ def main():
     def batch_tensors(batch, eval_mode=False):
         t = generate_tinsts_binary_label(batch, vocab, eval_mode)
         # Use the original project's TensorInstances layout, preserve targets.
-        words = torch.as_tensor(t.src_words, dtype=torch.long, device=device)
+        # Original CPUEmbedding keeps its lookup weights on CPU.
+        words = torch.as_tensor(t.src_words, dtype=torch.long, device="cpu")
         masks = torch.as_tensor(t.src_masks, dtype=torch.float32, device=device)
         lengths = torch.as_tensor(t.word_len, dtype=torch.long, device=device)
         targets = torch.as_tensor(t.tags, dtype=torch.float32, device=device)

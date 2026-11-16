@@ -83,7 +83,8 @@ def score_anomaly(events: tuple) -> float:
     if not events:
         raise ValueError('Cannot score an empty event history')
     ids = [_word2id.get(str(e), 3) for e in events]
-    words = torch.tensor([ids], dtype=torch.long, device=_device)
+    # Original CPUEmbedding expects CPU indices, even when the GRU uses CUDA.
+    words = torch.tensor([ids], dtype=torch.long, device="cpu")
     masks = torch.ones((1, len(ids)), dtype=torch.float32, device=_device)
     word_len = torch.tensor([len(ids)], dtype=torch.long, device=_device)
     with torch.inference_mode():
