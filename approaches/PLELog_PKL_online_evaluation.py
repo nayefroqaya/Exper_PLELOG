@@ -38,7 +38,7 @@ def parse_label(value: Any) -> bool:
             return bool(value)
     if isinstance(value, str):
         s = value.strip().lower()
-        if s in ('normal', '0', 'false', 'benign'):
+        if s in ('normal', '0', 'false', 'benign', '-'):
             return False
         if s in ('anomalous', 'anomaly', 'abnormal', '1', 'true'):
             return True
