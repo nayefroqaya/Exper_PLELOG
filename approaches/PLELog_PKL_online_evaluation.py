@@ -70,7 +70,15 @@ def read_sequences(path: Path, id_column: str, event_column: str,
         sid = str(row[id_column])
         if not sid.strip():
             raise ValueError(f'{path}: empty ID at row {idx!r}')
-        label = parse_label(row[label_column])
+        if label_column == 'Original_Label':
+            # Exact behavior of the supplied PKLPreprocessor.fix_labels():
+            # only '-' and 'Normal' are normal; all other raw codes are anomalous.
+            raw = row[label_column]
+            if pd.isna(raw):
+                raise ValueError(f'{path}: null Original_Label at row {idx!r}')
+            label = str(raw).strip() not in ('-', 'Normal')
+        else:
+            label = parse_label(row[label_column])
         # Match PKLPreprocessor: a block is anomalous if ANY of its events is anomalous.
         labels[sid] = labels.get(sid, False) or label
         value = row[event_column]
