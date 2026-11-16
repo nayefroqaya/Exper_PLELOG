@@ -1,18 +1,9 @@
 """Validation-calibrated causal online evaluation for an unchanged PLELog model.
 
 This is an evaluation *adapter*, not a reimplementation of PLELog training.
-Supply a scorer from your PLELog repository using --scorer module:function.
-The scorer accepts a tuple of event IDs/templates and must return the
-probability of the *Anomalous* class, using an already-trained frozen model.
-
-Example:
- python PLELog_PKL_online_evaluation.py \
-   --data_root ../../LWADLS/datasets --dataset_name HDFS \
-   --event-column EventId --label-column Label \
-   --scorer my_plelog_adapter:score_anomaly --window 120
-
-You MUST implement my_plelog_adapter.score_anomaly(events) against your
-repository's PLELog instance/encoding APIs. No model or weights are changed.
+Use the included my_plelog_adapter.py together with the original repository.
+Provide an original trained checkpoint and the exact word2id mapping saved
+during training. No model or weights are changed.
 
 Security: pickle files execute arbitrary code when loaded. Only open trusted PKLs.
 """
@@ -80,9 +71,8 @@ def read_sequences(path: Path, id_column: str, event_column: str,
         if not sid.strip():
             raise ValueError(f'{path}: empty ID at row {idx!r}')
         label = parse_label(row[label_column])
-        if sid in labels and labels[sid] != label:
-            raise ValueError(f'{path}: conflicting labels for {sid}')
-        labels[sid] = label
+        # Match PKLPreprocessor: a block is anomalous if ANY of its events is anomalous.
+        labels[sid] = labels.get(sid, False) or label
         value = row[event_column]
         if isinstance(value, (list, tuple, np.ndarray)):
             values = list(value)
@@ -221,11 +211,21 @@ def main() -> None:
                    help='Root folder for reading PKL files, e.g., ../../LWADLS/datasets')
     p.add_argument('--dataset_name', '--dataset-name', dest='dataset_name', required=True,
                    help='Dataset folder name, e.g. HDFS, BGL or TH_1G')
-    p.add_argument('--event-column', required=True,
+    p.add_argument('--event-column', default='EventId',
                    help='Event list column, or one-event-per-row column')
-    p.add_argument('--label-column', required=True)
+    p.add_argument('--label-column', default='Original_Label')
     p.add_argument('--id-column', default='Node_block_id')
-    p.add_argument('--scorer', required=True, help='Trusted module:function, returning P(anomaly)')
+    p.add_argument('--scorer', default='my_plelog_adapter:score_anomaly',
+                   help='Trusted module:function, returning P(anomaly)')
+    p.add_argument('--model-checkpoint', type=Path,
+                   help='Original PLELog best/last .pt state_dict')
+    p.add_argument('--word2id-json', type=Path,
+                   help='Exact training-time vocab._word2id mapping saved as JSON')
+    p.add_argument('--repo-root', default='.',
+                   help='PLELog repository root containing models/, module/, CONSTANTS.py')
+    p.add_argument('--anomaly-id', type=int, default=1, choices=(0, 1),
+                   help='Anomalous class index from original training labels')
+    p.add_argument('--device', default='cpu', choices=('cpu', 'cuda'))
     p.add_argument('--window', type=int, default=120)
     p.add_argument('--consecutive-candidates', default='1,2,3,5')
     p.add_argument('--thresholds', default='0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95,0.99')
@@ -257,6 +257,14 @@ def main() -> None:
     check_disjoint(splits)
     print('Validated input sizes:', {k: len(v) for k, v in splits.items()}, file=sys.stderr)
     scorer = import_scorer(args.scorer)
+    if args.scorer == 'my_plelog_adapter:score_anomaly':
+        if not args.model_checkpoint or not args.word2id_json:
+            p.error('--model-checkpoint and --word2id-json are required for the original PLELog adapter')
+        import my_plelog_adapter
+        my_plelog_adapter.configure(checkpoint=str(args.model_checkpoint),
+                                   word2id_json=str(args.word2id_json),
+                                   repo_root=args.repo_root,
+                                   anomaly_id=args.anomaly_id, device=args.device)
     # The original model is trained externally, on full sequences, with no prefix augmentation.
     # No training/weight changes occur here. Validation is used ONLY for alert calibration.
     val_scores = score_causally(splits['val'], scorer, args.window)
