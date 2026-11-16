@@ -135,6 +135,103 @@ def score_causally(seqs: list[Sequence], scorer: Callable[[tuple], float],
     return outputs
 
 
+
+def score_full_sequences(seqs: list[Sequence], scorer: Callable[[tuple], float],
+                         max_events: int = 500) -> list[float]:
+    """Run original PLELog once per complete sequence (no early alert).
+
+    The uploaded original Common.py caps tokenized inputs at 500 events; use
+    the same maximum length instead of evaluating an incompatible longer tensor.
+    """
+    result = []
+    for seq in tqdm(seqs, desc='Test original full-sequence inference',
+                    unit='sequence', dynamic_ncols=True, file=sys.stderr):
+        if not seq.events:
+            raise ValueError(f'Empty sequence {seq.sequence_id}')
+        history = seq.events[:max_events]
+        prob = float(scorer(history))
+        if not math.isfinite(prob) or not (0 <= prob <= 1):
+            raise ValueError(f'Invalid original probability {prob!r} for {seq.sequence_id}')
+        result.append(prob)
+    return result
+
+
+def evaluate_original(seqs: list[Sequence], probabilities: list[float],
+                      threshold: float, fp_weight: float, fn_weight: float,
+                      delay_weight: float) -> dict[str, Any]:
+    """Original PLELog: one decision at sequence end, no early alerts."""
+    if len(seqs) != len(probabilities):
+        raise ValueError('Original score count must match number of test sequences')
+    tp = tn = fp = fn = 0
+    for seq, prob in zip(seqs, probabilities):
+        predicted = prob >= threshold
+        if seq.anomalous and predicted:
+            tp += 1
+        elif seq.anomalous:
+            fn += 1
+        elif predicted:
+            fp += 1
+        else:
+            tn += 1
+    p = tp / (tp + fp) if tp + fp else 0.0
+    r = tp / (tp + fn) if tp + fn else 0.0
+    f1 = 2*p*r/(p+r) if p+r else 0.0
+    fpr = fp/(fp+tn) if fp+tn else 0.0
+    # Full-sequence predictions only become available at the end of a sequence.
+    # No detected anomaly can therefore count as early detection (<100%).
+    delay_cost = delay_weight * tp
+    fp_cost, fn_cost = fp_weight * fp, fn_weight * fn
+    return {
+        'n_sequences':len(seqs), 'n_anomalous':sum(x.anomalous for x in seqs),
+        'threshold':threshold, 'consecutive':None,
+        'TP':tp, 'TN':tn, 'FP':fp, 'FN':fn,
+        'precision':p, 'recall':r, 'F1':f1, 'FPR':fpr,
+        'coverage':r, 'AvgRatio_detected_only': 1.0 if tp else None,
+        'EDR@25':0.0, 'EDR@50':0.0, 'EDR@75':0.0,
+        'FP_cost':fp_cost, 'FN_cost':fn_cost, 'delay_cost':delay_cost,
+        'total_cost':fp_cost+fn_cost+delay_cost,
+    }
+
+
+TABLE_METRICS = [
+    ('Test sequences', 'n_sequences'),
+    ('Truly anomalous sequences', 'n_anomalous'),
+    ('TP', 'TP'), ('TN', 'TN'), ('FP', 'FP'), ('FN', 'FN'),
+    ('Precision', 'precision'), ('Recall', 'recall'), ('F1', 'F1'),
+    ('FPR', 'FPR'), ('AvgRatio (detected only)', 'AvgRatio_detected_only'),
+    ('EDR@25', 'EDR@25'), ('EDR@50', 'EDR@50'), ('EDR@75', 'EDR@75'),
+    ('FP cost', 'FP_cost'), ('FN cost', 'FN_cost'),
+    ('Delay cost', 'delay_cost'), ('Total cost', 'total_cost'),
+]
+
+
+def format_metric(value: Any) -> str:
+    if value is None:
+        return 'N/A'
+    if isinstance(value, (int, np.integer)):
+        return str(value)
+    return f'{value:.6f}'
+
+
+def display_comparison(original: dict[str, Any], online: dict[str, Any]) -> None:
+    header = f'{"Metric":<29} {"Original PLELog":>20} {"Online PLELog":>20}'
+    print('\n' + header)
+    print('-' * len(header))
+    for label, key in TABLE_METRICS:
+        print(f'{label:<29} {format_metric(original[key]):>20} {format_metric(online[key]):>20}')
+    print()
+
+
+def save_comparison_csv(path: Path, original: dict[str, Any],
+                        online: dict[str, Any]) -> None:
+    import csv
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Metric', 'Original PLELog', 'Online PLELog'])
+        for label, key in TABLE_METRICS:
+            writer.writerow([label, format_metric(original[key]), format_metric(online[key])])
+
 def first_alert(scores: np.ndarray, threshold: float, consecutive: int) -> int | None:
     count = 0
     for index, p in enumerate(scores):
@@ -242,6 +339,12 @@ def main() -> None:
                    help='Anomalous class index from original training labels')
     p.add_argument('--device', default='auto', choices=('auto', 'cpu', 'cuda'))
     p.add_argument('--window', type=int, default=120)
+    p.add_argument('--standard-threshold', type=float, default=0.5,
+                   help='Original full-sequence decision threshold (default 0.5)')
+    p.add_argument('--standard-max-events', type=int, default=500,
+                   help='Original Common.py input truncation length (default 500)')
+    p.add_argument('--comparison-csv', type=Path, default=None,
+                   help='Optional comparison CSV path (defaults beside --output)')
     p.add_argument('--consecutive-candidates', default='1,2,3,5')
     p.add_argument('--thresholds', default='0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95,0.99')
     p.add_argument('--max-validation-fpr', type=float, default=None)
@@ -252,6 +355,10 @@ def main() -> None:
     args = p.parse_args()
     if args.window < 1:
         p.error('--window must be positive')
+    if args.standard_max_events < 1:
+        p.error('--standard-max-events must be positive')
+    if not 0 <= args.standard_threshold <= 1:
+        p.error('--standard-threshold must be between 0 and 1')
     for name in ('fp_weight', 'fn_weight', 'delay_weight'):
         if getattr(args, name) < 0:
             p.error(f'--{name.replace("_", "-")} cannot be negative')
@@ -293,19 +400,34 @@ def main() -> None:
     test_results = evaluate(splits['test'], test_scores,
                             selected['threshold'], selected['consecutive'],
                             args.fp_weight, args.fn_weight, args.delay_weight)
+    print('Starting original full-sequence test inference...', file=sys.stderr, flush=True)
+    original_probs = score_full_sequences(splits['test'], scorer, args.standard_max_events)
+    original_results = evaluate_original(splits['test'], original_probs,
+                                         args.standard_threshold, args.fp_weight,
+                                         args.fn_weight, args.delay_weight)
     result = {
         'protocol': 'frozen original PLELog weights; rolling causal inference; validation-calibrated alerts',
         'window': args.window, 'split_counts': {k: len(v) for k, v in splits.items()},
         'validation_selection': selected, 'test_metrics': test_results,
+        'original_test_metrics': original_results,
+        'online_test_metrics': test_results,
+        'original_threshold': args.standard_threshold,
+        'original_max_input_events': args.standard_max_events,
         'notes': ['EDR denominator = all anomalous sequences',
                   'AvgRatio conditional on true-positive detected sequences',
                   'Delay cost = delay_weight * sum(detection fraction over true positives)',
                   'Costs are illustrative unless weights match the study protocol',
-                  'This script does not train the PLELog model or test original full-sequence baseline'],
+                  'Original: one end-of-sequence decision with original Common.py 500-event input cap',
+                  'Original threshold is fixed at 0.5 by default; online policy is calibrated on validation',
+                  'The script does not retrain or change PLELog model weights'],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2), encoding='utf-8')
-    print(json.dumps(result, indent=2))
+    comparison_path = args.comparison_csv or args.output.with_name(args.output.stem + '_comparison.csv')
+    save_comparison_csv(comparison_path, original_results, test_results)
+    display_comparison(original_results, test_results)
+    print(f'JSON metrics: {args.output}', file=sys.stderr)
+    print(f'Comparison CSV: {comparison_path}', file=sys.stderr)
 
 
 if __name__ == '__main__':
