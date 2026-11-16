@@ -21,6 +21,7 @@ from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
+from tqdm.auto import tqdm
 
 
 @dataclass(frozen=True)
@@ -113,18 +114,24 @@ def import_scorer(spec: str) -> Callable[[tuple], float]:
 
 
 def score_causally(seqs: list[Sequence], scorer: Callable[[tuple], float],
-                   window: int) -> list[np.ndarray]:
+                   window: int, split_name: str = 'Inference') -> list[np.ndarray]:
+    """Score every prefix causally, with progress measured in processed events."""
     outputs = []
-    for seq in seqs:
-        scores = []
-        for index in range(len(seq.events)):
-            # Only the current event and up to window - 1 preceding events.
-            history = seq.events[max(0, index + 1 - window):index + 1]
-            prob = float(scorer(history))
-            if not math.isfinite(prob) or not 0 <= prob <= 1:
-                raise ValueError(f'Invalid anomaly probability {prob!r} for {seq.sequence_id}')
-            scores.append(prob)
-        outputs.append(np.asarray(scores, dtype=float))
+    total_events = sum(len(seq.events) for seq in seqs)
+    with tqdm(total=total_events, desc=f'{split_name} online inference',
+              unit='event', dynamic_ncols=True, mininterval=0.5, leave=True,
+              file=sys.stderr) as progress:
+        for seq in seqs:
+            scores = []
+            for index in range(len(seq.events)):
+                # Only current and preceding events; never use future observations.
+                history = seq.events[max(0, index + 1 - window):index + 1]
+                prob = float(scorer(history))
+                if not math.isfinite(prob) or not 0 <= prob <= 1:
+                    raise ValueError(f'Invalid anomaly probability {prob!r} for {seq.sequence_id}')
+                scores.append(prob)
+                progress.update(1)
+            outputs.append(np.asarray(scores, dtype=float))
     return outputs
 
 
@@ -275,11 +282,14 @@ def main() -> None:
                                    anomaly_id=args.anomaly_id, device=args.device)
     # The original model is trained externally, on full sequences, with no prefix augmentation.
     # No training/weight changes occur here. Validation is used ONLY for alert calibration.
-    val_scores = score_causally(splits['val'], scorer, args.window)
+    print('Model loaded. Starting validation online inference...', file=sys.stderr, flush=True)
+    val_scores = score_causally(splits['val'], scorer, args.window, split_name='Validation')
+    print('Calibrating alert policy on validation data...', file=sys.stderr, flush=True)
     selected = calibrate(splits['val'], val_scores, thresholds, k_candidates,
                          args.max_validation_fpr, args.fp_weight,
                          args.fn_weight, args.delay_weight)
-    test_scores = score_causally(splits['test'], scorer, args.window)
+    print('Starting test online inference...', file=sys.stderr, flush=True)
+    test_scores = score_causally(splits['test'], scorer, args.window, split_name='Test')
     test_results = evaluate(splits['test'], test_scores,
                             selected['threshold'], selected['consecutive'],
                             args.fp_weight, args.fn_weight, args.delay_weight)
