@@ -233,7 +233,7 @@ def main() -> None:
                    help='PLELog repository root containing models/, module/, CONSTANTS.py')
     p.add_argument('--anomaly-id', type=int, default=1, choices=(0, 1),
                    help='Anomalous class index from original training labels')
-    p.add_argument('--device', default='cpu', choices=('cpu', 'cuda'))
+    p.add_argument('--device', default='auto', choices=('auto', 'cpu', 'cuda'))
     p.add_argument('--window', type=int, default=120)
     p.add_argument('--consecutive-candidates', default='1,2,3,5')
     p.add_argument('--thresholds', default='0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,0.95,0.99')

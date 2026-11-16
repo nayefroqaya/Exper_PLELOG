@@ -38,13 +38,17 @@ def main():
     p.add_argument('--min-cluster-size', type=int, default=100)
     p.add_argument('--min-samples', type=int, default=100)
     p.add_argument('--seed', type=int, default=42)
-    p.add_argument('--device', choices=['cpu', 'cuda'], default='cpu')
+    p.add_argument('--device', choices=['auto', 'cpu', 'cuda'], default='auto')
     p.add_argument('--eval-every', type=int, default=500, help='Original dev-check frequency in batches')
     p.add_argument('--run-online', action='store_true', help='Evaluate after training (requires my_plelog_adapter.py)')
     p.add_argument('--window', type=int, default=120)
     args = p.parse_args()
-    if args.device == 'cuda' and not torch.cuda.is_available():
-        p.error('CUDA requested but unavailable')
+    if args.device == 'auto':
+        args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    elif args.device == 'cuda' and not torch.cuda.is_available():
+        print('CUDA unavailable: falling back to CPU', flush=True)
+        args.device = 'cpu'
+    print(f'Selected training device: {args.device}', flush=True)
     if args.epochs < 1 or args.batch_size < 1 or args.window < 1:
         p.error('epochs, batch-size and window must be positive')
     root = Path(args.repo_root).resolve()

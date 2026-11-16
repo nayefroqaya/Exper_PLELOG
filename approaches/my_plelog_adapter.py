@@ -22,7 +22,7 @@ _anomaly_id = 1
 
 
 def configure(*, checkpoint: str, word2id_json: str, repo_root: str = '.',
-              anomaly_id: int = 1, device: str = 'cpu') -> None:
+              anomaly_id: int = 1, device: str = 'auto') -> None:
     global _model, _word2id, _device, _anomaly_id
     import numpy as np
     import torch
@@ -32,7 +32,12 @@ def configure(*, checkpoint: str, word2id_json: str, repo_root: str = '.',
         sys.path.insert(0, root)
     from models.gru import AttGRUModel  # original architecture, not reimplemented
 
-    _device = torch.device(device)
+    selected = ('cuda' if torch.cuda.is_available() else 'cpu') if device == 'auto' else device
+    if selected == 'cuda' and not torch.cuda.is_available():
+        print('CUDA unavailable: falling back to CPU', flush=True)
+        selected = 'cpu'
+    _device = torch.device(selected)
+    print(f'Selected inference device: {_device}', flush=True)
     mapping = json.loads(Path(word2id_json).read_text(encoding='utf8'))
     if not isinstance(mapping, dict) or not mapping:
         raise ValueError('word2id JSON must be a nonempty token-to-index dictionary')
